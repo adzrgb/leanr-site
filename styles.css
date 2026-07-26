@@ -766,15 +766,16 @@ blockquote footer {
 .remove-btn {
   background: none;
   border: none;
-  color: var(--accent-pink);
+  color: #9ca3af;
   cursor: pointer;
-  font-weight: 600;
-  font-size: 0.85rem;
-  text-decoration: underline;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 0 0.2rem;
+  transition: color 0.2s;
 }
 
 .remove-btn:hover {
-  color: var(--primary-blue);
+  color: #dc2626;
 }
 
 .cart-summary {

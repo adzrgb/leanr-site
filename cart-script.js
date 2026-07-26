@@ -84,7 +84,7 @@ function renderCart() {
       <span>£${item.price}</span>
       <span>${item.quantity}</span>
       <span>£${itemTotal.toFixed(2)}</span>
-      <button class="remove-btn" data-index="${index}">Remove</button>
+      <button class="remove-btn" data-index="${index}" title="Remove item">&times;</button>
     `;
     itemsList.appendChild(itemRow);
   });
