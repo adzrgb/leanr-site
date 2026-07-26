@@ -4,11 +4,6 @@ let discountApplied = false;
 const DISCOUNT_CODE = 'LEANR10';
 const DISCOUNT_PERCENT = 10;
 
-// API Base URL - works for both local and production
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:5000'
-  : window.location.origin.replace(/:\d+$/, ':5000'); // Replace port with 5000 for backend
-
 const cartCount = document.getElementById('cart-count');
 
 // Handle disclaimer banner close
@@ -167,23 +162,12 @@ if (checkoutForm) {
     };
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/send-order`, {
+      const response = await fetch(window.location.origin + '/api/send-order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        credentials: 'omit',
         body: JSON.stringify(orderData)
-      }).catch(e => {
-        // Fallback for localhost on different port
-        return fetch('http://127.0.0.1:5000/api/send-order', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          credentials: 'omit',
-          body: JSON.stringify(orderData)
-        });
       });
       
       if (response.ok) {

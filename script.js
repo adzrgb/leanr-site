@@ -1,10 +1,5 @@
 let cart = JSON.parse(localStorage.getItem('leanr-cart')) || [];
 
-// API Base URL - works for both local and production
-const API_BASE_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:5000'
-  : window.location.origin.replace(/:\d+$/, ':5000'); // Replace port with 5000 for backend
-
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   initBannerClose();
