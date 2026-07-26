@@ -27,7 +27,7 @@ CORS(app, resources={
 
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
-BUSINESS_EMAIL_PASSWORD = os.getenv("BUSINESS_EMAIL_PASSWORD", "ugxb naur dasv pkeg")
+BUSINESS_EMAIL_PASSWORD = os.getenv("BUSINESS_EMAIL_PASSWORD", "ugxbnaurdazvpkeg").replace(" ", "")  # Remove spaces from app-specific password
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
@@ -35,6 +35,7 @@ SMTP_PORT = 587
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD_HASH = hashlib.sha256("Qx7m#K2$pL9@vN4b".encode()).hexdigest()
 print(f"DEBUG: ADMIN_USERNAME={ADMIN_USERNAME}, ADMIN_PASSWORD_HASH={ADMIN_PASSWORD_HASH}")
+print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}, Password length: {len(BUSINESS_EMAIL_PASSWORD)}")
 ADMIN_TOKENS = {}  # Store active tokens
 
 # File paths for data storage
@@ -150,6 +151,12 @@ def send_order():
 def send_order_emails(data, items_html):
     """Send order confirmation emails"""
     try:
+        print(f"\n{'='*60}")
+        print(f"STARTING EMAIL SEND FOR ORDER: {data['orderNumber']}")
+        print(f"Customer: {data['customerEmail']}")
+        print(f"Business email: {BUSINESS_EMAIL}")
+        print(f"{'='*60}\n")
+        
         # Business email body
         business_email_body = f"""
         <html>
@@ -250,15 +257,35 @@ def send_order_emails(data, items_html):
         </html>
         """
         
-        send_email(BUSINESS_EMAIL, f"New Order: {data['orderNumber']}", business_email_body)
-        send_email(data['customerEmail'], f"Order Confirmation: {data['orderNumber']}", customer_email_body)
-        print(f"✓ Emails sent successfully")
+        # Send business email
+        print(f"[1/2] Attempting to send BUSINESS email...")
+        try:
+            send_email(BUSINESS_EMAIL, f"New Order: {data['orderNumber']}", business_email_body)
+            print(f"✓ Business email sent successfully")
+        except Exception as e:
+            print(f"✗ Business email FAILED: {str(e)}")
+            raise
+        
+        # Send customer email
+        print(f"[2/2] Attempting to send CUSTOMER email...")
+        try:
+            send_email(data['customerEmail'], f"Order Confirmation: {data['orderNumber']}", customer_email_body)
+            print(f"✓ Customer email sent successfully")
+        except Exception as e:
+            print(f"✗ Customer email FAILED: {str(e)}")
+            raise
+        
+        print(f"✓ ALL EMAILS SENT SUCCESSFULLY for order {data['orderNumber']}\n")
     except Exception as e:
         print(f"✗ Email sending failed: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
 
 def send_email(recipient, subject, html_body):
     try:
-        print(f"Sending email to {recipient}...")
+        print(f"\n  → Sending email to {recipient}...")
+        print(f"    Subject: {subject}")
+        
         # Create message
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
@@ -271,19 +298,21 @@ def send_email(recipient, subject, html_body):
         msg.attach(part)
         
         # Send via SMTP
-        print(f"Connecting to {SMTP_SERVER}:{SMTP_PORT}...")
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            print("Starting TLS...")
+        print(f"    Connecting to {SMTP_SERVER}:{SMTP_PORT}...")
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
+            print(f"    Starting TLS...")
             server.starttls()
-            print(f"Logging in as {BUSINESS_EMAIL}...")
+            print(f"    Logging in as {BUSINESS_EMAIL}...")
             server.login(BUSINESS_EMAIL, BUSINESS_EMAIL_PASSWORD)
-            print(f"Sending mail...")
+            print(f"    Sending mail...")
             server.sendmail(BUSINESS_EMAIL, recipient, msg.as_string())
         
-        print(f"✓ Email sent successfully to {recipient}")
+        print(f"    ✓ Email sent successfully to {recipient}\n")
     except Exception as e:
         import traceback
-        print(f"✗ Failed to send email to {recipient}: {str(e)}")
+        print(f"    ✗ FAILED to send email to {recipient}")
+        print(f"    Error: {str(e)}")
+        print(f"    Traceback:")
         print(traceback.format_exc())
         raise
 
