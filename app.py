@@ -26,10 +26,13 @@ CORS(app, resources={
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+# Resend sender email (use onboarding@resend.dev as fallback for testing)
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
 print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}")
+print(f"DEBUG: Resend sender email: {RESEND_FROM_EMAIL}")
 print(f"DEBUG: Resend API Key present: {'Yes' if RESEND_API_KEY else 'No - will use API key from environment'}")
 
 # Admin credentials
@@ -303,10 +306,11 @@ def send_email(recipient, subject, html_body):
                 "Content-Type": "application/json",
             },
             json={
-                "from": f"LEANr Wellness <{BUSINESS_EMAIL}>",
+                "from": RESEND_FROM_EMAIL,
                 "to": recipient,
                 "subject": subject,
                 "html": html_body,
+                "reply_to": BUSINESS_EMAIL,  # Reply-To so customers reply to business email
             },
             timeout=10
         )
