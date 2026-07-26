@@ -234,49 +234,66 @@ document.querySelector('.signup-form')?.addEventListener('submit', (event) => {
 updateCartCount();
 renderCart();
 
-// Setup discount code handler AFTER DOM is ready
+// Setup discount code handler - INLINE to ensure it runs
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOMContentLoaded: Setting up discount handler');
+  setupDiscountHandler();
+});
+
 function setupDiscountHandler() {
   const discountBtn = document.getElementById('apply-discount-btn');
   const discountInput = document.getElementById('discount-code');
   const discountMessage = document.getElementById('discount-message');
+  
+  console.log('setupDiscountHandler called', {btn: !!discountBtn, input: !!discountInput, msg: !!discountMessage});
   
   if (!discountBtn) {
     console.warn('Discount button not found');
     return;
   }
   
-  console.log('Discount handler setup: DISCOUNT_CODE=' + DISCOUNT_CODE);
+  // Remove any previous listeners
+  const newBtn = discountBtn.cloneNode(true);
+  discountBtn.parentNode.replaceChild(newBtn, discountBtn);
   
-  discountBtn.addEventListener('click', function() {
-    console.log('Apply button clicked');
+  newBtn.addEventListener('click', function(event) {
+    console.log('Apply button clicked!');
+    event.preventDefault();
     const code = discountInput.value.trim().toUpperCase();
-    console.log('Entered code: ' + code);
+    console.log('Code entered: ' + code + ', Expected: ' + DISCOUNT_CODE);
     
     if (code === DISCOUNT_CODE) {
-      console.log('Valid discount code!');
+      console.log('✓ Valid discount!');
       discountApplied = true;
       discountMessage.textContent = '✓ Discount code applied! (10% off)';
       discountMessage.style.color = '#10b981';
-      discountBtn.textContent = 'Applied';
-      discountBtn.disabled = true;
+      newBtn.textContent = 'Applied';
+      newBtn.disabled = true;
       renderCart();
     } else if (code === '') {
       discountMessage.textContent = 'Please enter a code';
       discountMessage.style.color = '#ef4444';
     } else {
-      console.log('Invalid code. Expected: ' + DISCOUNT_CODE + ' but got: ' + code);
+      console.log('✗ Invalid code');
       discountMessage.textContent = 'Invalid discount code';
       discountMessage.style.color = '#ef4444';
     }
   });
   
-  // Allow Enter key to apply discount
+  // Allow Enter key
   discountInput.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
-      discountBtn.click();
+      newBtn.click();
     }
   });
+  
+  console.log('Discount handler setup complete');
 }
 
-// Call after a small delay to ensure DOM is ready
-setTimeout(setupDiscountHandler, 100);
+// Also try to set it up immediately in case DOM is already loaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', setupDiscountHandler);
+} else {
+  // DOM is already loaded
+  setTimeout(setupDiscountHandler, 50);
+}
