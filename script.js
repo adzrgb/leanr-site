@@ -212,7 +212,7 @@ function saveCart() {
 
 // Helper function to check variant stock and update button state
 function updateButtonForVariant(productName, selectedText, addButton) {
-  if (!addButton || !globalStockData || globalStockData.length === 0) {
+  if (!addButton || !globalStockData || !Array.isArray(globalStockData)) {
     return;
   }
   
@@ -238,10 +238,11 @@ function updateButtonForVariant(productName, selectedText, addButton) {
 // Update stock info display for products with variants
 function updateVariantStockInfo(productName, infoElementId) {
   const infoEl = document.getElementById(infoElementId);
-  if (!infoEl || !globalStockData || globalStockData.length === 0) {
+  if (!infoEl || !globalStockData || !Array.isArray(globalStockData)) {
     return;
   }
   
+  // globalStockData is an array of objects with name and variants properties
   const productData = globalStockData.find(item => item.name === productName);
   if (!productData || !Array.isArray(productData.variants)) {
     return;
@@ -254,7 +255,7 @@ function updateVariantStockInfo(productName, infoElementId) {
   
   productData.variants.forEach(v => {
     if (v.stock > 0) {
-      inStock.push(`${v.name} (${v.stock} left)`);
+      inStock.push(`${v.name}: ${v.stock} left`);
     } else {
       outOfStock.push(v.name);
     }
@@ -263,7 +264,7 @@ function updateVariantStockInfo(productName, infoElementId) {
   // Show different messages based on stock situation
   if (outOfStock.length > 0 && inStock.length > 0) {
     // Some variants out of stock
-    infoText = `⚠️ ${outOfStock.join(', ')} out of stock • ${inStock.join(', ')} available`;
+    infoText = `⚠️ ${outOfStock.join(', ')} out of stock • ${inStock.join(', ')} in stock`;
   } else if (outOfStock.length === productData.variants.length) {
     // All out of stock
     infoText = '❌ All variants currently out of stock';
