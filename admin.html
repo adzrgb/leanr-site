@@ -159,8 +159,9 @@
     
     .stock-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
       gap: 1.5rem;
+      margin-bottom: 2rem;
     }
     
     .stock-card {
@@ -173,10 +174,11 @@
     .stock-card h3 {
       margin: 0 0 1rem 0;
       color: #0052cc;
+      font-size: 1.1rem;
     }
     
     .stock-form-group {
-      margin-bottom: 1rem;
+      margin-bottom: 1.25rem;
     }
     
     .stock-form-group label {
@@ -184,34 +186,71 @@
       margin-bottom: 0.5rem;
       color: #0f172a;
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
     }
     
     .stock-form-group input {
       width: 100%;
-      padding: 0.5rem;
+      padding: 0.75rem;
       border: 1px solid #cbd5e1;
-      border-radius: 4px;
+      border-radius: 6px;
       box-sizing: border-box;
+      font-size: 1rem;
+      font-family: inherit;
     }
     
     .stock-form-group input:focus {
       outline: none;
       border-color: #0052cc;
+      box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.1);
     }
     
-    .update-btn {
-      width: 100%;
-      background: linear-gradient(135deg, #0052cc, #7c3aed);
+    .stock-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    
+    .save-stock-btn {
+      background: linear-gradient(135deg, #10b981, #059669);
       color: white;
       border: none;
-      padding: 0.75rem;
+      padding: 0.75rem 2rem;
       border-radius: 6px;
       cursor: pointer;
       font-weight: 600;
+      font-size: 1rem;
+      transition: opacity 0.2s, transform 0.1s;
     }
     
-    .update-btn:hover {
+    .save-stock-btn:hover:not(:disabled) {
+      opacity: 0.9;
+    }
+    
+    .save-stock-btn:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+    
+    .save-stock-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    .reset-stock-btn {
+      background: #6b7280;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: opacity 0.2s;
+    }
+    
+    .reset-stock-btn:hover {
       opacity: 0.9;
     }
     
@@ -288,6 +327,110 @@
       background: #cbd5e1;
       cursor: not-allowed;
     }
+    
+    /* Mobile / iPhone Responsive Styles */
+    @media (max-width: 768px) {
+      .admin-container {
+        padding: 1rem;
+      }
+      
+      .admin-header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+        padding: 1rem;
+      }
+      
+      .admin-header h1 {
+        font-size: 1.5rem;
+      }
+      
+      .logout-btn {
+        width: 100%;
+      }
+      
+      .tabs {
+        gap: 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .tab-button {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+        white-space: nowrap;
+      }
+      
+      .tab-content {
+        padding: 1.25rem;
+      }
+      
+      .stock-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+      }
+      
+      .stock-card {
+        padding: 1.25rem;
+      }
+      
+      .stock-form-group input {
+        padding: 0.875rem;
+        font-size: 16px; /* Prevents auto-zoom on iOS */
+      }
+      
+      .stock-actions {
+        flex-direction: column;
+      }
+      
+      .save-stock-btn,
+      .reset-stock-btn {
+        width: 100%;
+        padding: 0.875rem 1.5rem;
+      }
+      
+      .order-card {
+        padding: 1rem;
+      }
+      
+      .payment-section {
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      
+      .payment-checkbox {
+        width: 24px;
+        height: 24px;
+      }
+      
+      .confirm-payment-btn {
+        width: 100%;
+        padding: 0.875rem;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .admin-container {
+        padding: 0.75rem;
+      }
+      
+      .tabs {
+        margin-bottom: 1rem;
+      }
+      
+      .tab-button {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+      }
+      
+      .stock-card h3 {
+        font-size: 1rem;
+      }
+      
+      .stock-form-group label {
+        font-size: 0.85rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -316,6 +459,10 @@
     <div id="stock" class="tab-content">
       <h2>Update Stock Levels</h2>
       <div id="stock-message" class="message"></div>
+      <div class="stock-actions">
+        <button class="save-stock-btn" id="save-stock-btn" onclick="saveAllStockChanges()">💾 Save All Changes</button>
+        <button class="reset-stock-btn" id="reset-stock-btn" onclick="resetStockForm()">Reset Form</button>
+      </div>
       <div class="stock-grid" id="stock-grid">
         <div class="empty-state">Loading products...</div>
       </div>
@@ -479,6 +626,9 @@
       }
     }
     
+    // Track stock changes
+    let stockChanges = {};
+    
     async function loadStockLevels() {
       try {
         const response = await fetch(window.location.origin + '/api/admin/stock', {
@@ -490,18 +640,33 @@
         const data = await response.json();
         const grid = document.getElementById('stock-grid');
         
+        // Reset changes tracker
+        stockChanges = {};
+        
         grid.innerHTML = data.stock.map(product => `
           <div class="stock-card">
             <h3>${product.name}</h3>
             ${product.variants ? product.variants.map(variant => `
               <div class="stock-form-group">
                 <label>${variant.name}</label>
-                <input type="number" min="0" value="${variant.stock}" onchange="updateStock('${product.name}', '${variant.name}', this.value)">
+                <input 
+                  type="number" 
+                  min="0" 
+                  value="${variant.stock}" 
+                  data-product="${product.name}"
+                  data-variant="${variant.name}"
+                  onchange="trackStockChange(this)">
               </div>
             `).join('') : `
               <div class="stock-form-group">
                 <label>Stock Level</label>
-                <input type="number" min="0" value="${product.stock}" onchange="updateStock('${product.name}', 'default', this.value)">
+                <input 
+                  type="number" 
+                  min="0" 
+                  value="${product.stock}"
+                  data-product="${product.name}"
+                  data-variant="default"
+                  onchange="trackStockChange(this)">
               </div>
             `}
           </div>
@@ -511,28 +676,75 @@
       }
     }
     
-    async function updateStock(productName, variant, newStock) {
-      const token = localStorage.getItem('admin_token');
+    function trackStockChange(input) {
+      const product = input.dataset.product;
+      const variant = input.dataset.variant;
+      const key = `${product}|${variant}`;
+      
+      stockChanges[key] = {
+        productName: product,
+        variant: variant,
+        stock: parseInt(input.value)
+      };
+    }
+    
+    async function saveAllStockChanges() {
+      const changes = Object.values(stockChanges);
+      
+      if (changes.length === 0) {
+        const msg = document.getElementById('stock-message');
+        msg.className = 'message';
+        msg.textContent = 'No changes to save';
+        return;
+      }
+      
+      const btn = document.getElementById('save-stock-btn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Saving...';
       
       try {
-        const response = await fetch(window.location.origin + '/api/admin/update-stock', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ productName, variant, stock: parseInt(newStock) })
-        });
-        
-        if (response.ok) {
-          const msg = document.getElementById('stock-message');
-          msg.className = 'message success';
-          msg.textContent = 'Stock updated successfully!';
-          setTimeout(() => msg.className = 'message', 2000);
+        for (const change of changes) {
+          const response = await fetch(window.location.origin + '/api/admin/update-stock', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+            },
+            body: JSON.stringify(change)
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to update ${change.productName}`);
+          }
         }
+        
+        // Clear changes
+        stockChanges = {};
+        
+        const msg = document.getElementById('stock-message');
+        msg.className = 'message success';
+        msg.textContent = `✓ Successfully saved ${changes.length} change${changes.length === 1 ? '' : 's'}!`;
+        
+        setTimeout(() => {
+          msg.className = 'message';
+        }, 3000);
+        
       } catch (error) {
-        console.error('Error updating stock:', error);
+        const msg = document.getElementById('stock-message');
+        msg.className = 'message error';
+        msg.textContent = `✗ Error: ${error.message}`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '💾 Save All Changes';
       }
+    }
+    
+    function resetStockForm() {
+      stockChanges = {};
+      loadStockLevels();
+      const msg = document.getElementById('stock-message');
+      msg.className = 'message';
+      msg.textContent = '';
     }
     
     async function confirmPayment(orderNumber, button) {
