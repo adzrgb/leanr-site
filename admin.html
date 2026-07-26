@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LEANr Admin | Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    body {
+      background: #f8fafc;
+    }
+    
+    .admin-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    .admin-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      background: white;
+      padding: 1.5rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .admin-header h1 {
+      margin: 0;
+      color: #0052cc;
+    }
+    
+    .logout-btn {
+      background: #dc2626;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    
+    .logout-btn:hover {
+      background: #b91c1c;
+    }
+    
+    .tabs {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .tab-button {
+      padding: 0.75rem 1.5rem;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      color: #64748b;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    
+    .tab-button.active {
+      color: #0052cc;
+      border-bottom-color: #0052cc;
+    }
+    
+    .tab-content {
+      display: none;
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    .orders-list {
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    
+    .order-card {
+      border: 1px solid #e2e8f0;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+    
+    .order-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    
+    .order-number {
+      font-weight: 600;
+      color: #0052cc;
+    }
+    
+    .order-date {
+      color: #64748b;
+      font-size: 0.9rem;
+    }
+    
+    .order-customer {
+      margin: 0.5rem 0;
+      color: #0f172a;
+    }
+    
+    .order-items {
+      background: white;
+      padding: 1rem;
+      border-radius: 6px;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    
+    .tracking-section {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    
+    .tracking-input {
+      flex: 1;
+      padding: 0.5rem;
+      border: 1px solid #0052cc;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    
+    .send-tracking-btn {
+      background: #0052cc;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .send-tracking-btn:hover {
+      background: #003d99;
+    }
+    
+    .send-tracking-btn:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+    }
+    
+    .stock-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+    
+    .stock-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 1.5rem;
+      border-radius: 8px;
+    }
+    
+    .stock-card h3 {
+      margin: 0 0 1rem 0;
+      color: #0052cc;
+    }
+    
+    .stock-form-group {
+      margin-bottom: 1rem;
+    }
+    
+    .stock-form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .stock-form-group input {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    
+    .stock-form-group input:focus {
+      outline: none;
+      border-color: #0052cc;
+    }
+    
+    .update-btn {
+      width: 100%;
+      background: linear-gradient(135deg, #0052cc, #7c3aed);
+      color: white;
+      border: none;
+      padding: 0.75rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    
+    .update-btn:hover {
+      opacity: 0.9;
+    }
+    
+    .message {
+      padding: 1rem;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    
+    .message.success {
+      background: #dcfce7;
+      color: #15803d;
+      display: block;
+    }
+    
+    .message.error {
+      background: #fee2e2;
+      color: #dc2626;
+      display: block;
+    }
+    
+    .empty-state {
+      text-align: center;
+      color: #64748b;
+      padding: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="admin-container">
+    <div class="admin-header">
+      <h1>LEANr Admin Dashboard</h1>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+    
+    <div class="tabs">
+      <button class="tab-button active" onclick="switchTab('orders')">Orders</button>
+      <button class="tab-button" onclick="switchTab('stock')">Stock Levels</button>
+      <button class="tab-button" onclick="switchTab('revenue')">Revenue</button>
+    </div>
+    
+    <!-- Orders Tab -->
+    <div id="orders" class="tab-content active">
+      <h2>Customer Orders</h2>
+      <div id="orders-message" class="message"></div>
+      <div id="orders-list" class="orders-list">
+        <div class="empty-state">Loading orders...</div>
+      </div>
+    </div>
+    
+    <!-- Stock Tab -->
+    <div id="stock" class="tab-content">
+      <h2>Update Stock Levels</h2>
+      <div id="stock-message" class="message"></div>
+      <div class="stock-grid" id="stock-grid">
+        <div class="empty-state">Loading products...</div>
+      </div>
+    </div>
+
+    <!-- Revenue Tab -->
+    <div id="revenue" class="tab-content">
+      <h2>Revenue & Analytics</h2>
+      <div id="revenue-message" class="message"></div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+        <div style="background: linear-gradient(135deg, #0052cc, #003d99); color: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 82, 204, 0.3);">
+          <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem;">Total Revenue</div>
+          <div id="total-revenue" style="font-size: 2.2rem; font-weight: bold;">£0.00</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #ec4899, #be185d); color: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 12px rgba(236, 72, 153, 0.3);">
+          <div style="font-size: 0.9rem; opacity: 0.9; margin-bottom: 0.5rem;">Total Orders</div>
+          <div id="total-orders" style="font-size: 2.2rem; font-weight: bold;">0</div>
+        </div>
+      </div>
+      <div style="background: white; padding: 2rem; border-radius: 12px; border: 1px solid #e2e8f0;">
+        <h3 style="margin-top: 0;">Top Selling Products</h3>
+        <div id="top-products">
+          <div class="empty-state">Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Check authentication on page load
+    window.addEventListener('load', () => {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        window.location.href = 'login.html';
+        return;
+      }
+      
+      loadOrders();
+      loadStockLevels();
+      loadRevenue();
+    });
+    
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      
+      document.getElementById(tabName).classList.add('active');
+      event.target.classList.add('active');
+    }
+    
+    function logout() {
+      localStorage.removeItem('admin_token');
+      window.location.href = 'login.html';
+    }
+    
+    async function loadOrders() {
+      const token = localStorage.getItem('admin_token');
+      
+      try {
+        const response = await fetch('http://127.0.0.1:5000/api/admin/orders', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).catch(() => 
+          fetch('http://localhost:5000/api/admin/orders', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+        );
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            logout();
+            return;
+          }
+          throw new Error('Failed to load orders');
+        }
+        
+        const data = await response.json();
+        const ordersList = document.getElementById('orders-list');
+        
+        if (!data.orders || data.orders.length === 0) {
+          ordersList.innerHTML = '<div class="empty-state">No orders yet</div>';
+          return;
+        }
+        
+        ordersList.innerHTML = data.orders.map(order => `
+          <div class="order-card">
+            <div class="order-header">
+              <span class="order-number">${order.orderNumber}</span>
+              <span class="order-date">${new Date(order.timestamp).toLocaleDateString()}</span>
+            </div>
+            <div class="order-customer">
+              <strong>${order.customerName}</strong><br>
+              ${order.customerEmail}<br>
+              ${order.customerPhone}
+            </div>
+            <div class="order-items">
+              ${order.items.map(item => `
+                ${item.name} (${item.option}) x${item.quantity} - £${(item.price * item.quantity).toFixed(2)}
+              `).join('<br>')}
+              <div style="margin-top: 0.5rem; font-weight: 600;">Total: £${order.subtotal.toFixed(2)}</div>
+            </div>
+            <div class="tracking-section">
+              <input type="text" class="tracking-input" placeholder="Enter tracking number..." value="${order.trackingNumber || ''}">
+              <button class="send-tracking-btn" onclick="sendTracking('${order.orderNumber}', this)">
+                ${order.trackingNumber ? 'Resend' : 'Send'} Tracking
+              </button>
+            </div>
+          </div>
+        `).join('');
+      } catch (error) {
+        document.getElementById('orders-list').innerHTML = `<div class="empty-state">Error loading orders: ${error.message}</div>`;
+      }
+    }
+    
+    async function sendTracking(orderNumber, button) {
+      const input = button.parentElement.querySelector('.tracking-input');
+      const trackingNumber = input.value.trim();
+      
+      if (!trackingNumber) {
+        alert('Please enter a tracking number');
+        return;
+      }
+      
+      const token = localStorage.getItem('admin_token');
+      button.disabled = true;
+      button.textContent = 'Sending...';
+      
+      try {
+        const response = await fetch('http://127.0.0.1:5000/api/admin/send-tracking', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          credentials: 'omit',
+          body: JSON.stringify({ orderNumber, trackingNumber })
+        }).catch(() =>
+          fetch('http://localhost:5000/api/admin/send-tracking', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            credentials: 'omit',
+            body: JSON.stringify({ orderNumber, trackingNumber })
+          })
+        );
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          const msg = document.getElementById('orders-message');
+          msg.className = 'message success';
+          msg.textContent = 'Tracking number sent successfully!';
+          setTimeout(() => msg.className = 'message', 3000);
+        } else {
+          alert(data.error || 'Failed to send tracking');
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      } finally {
+        button.disabled = false;
+        button.textContent = button.parentElement.querySelector('.tracking-input').value.trim() ? 'Resend Tracking' : 'Send Tracking';
+      }
+    }
+    
+    async function loadStockLevels() {
+      try {
+        const response = await fetch('http://127.0.0.1:5000/api/admin/stock', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token')}` }
+        }).catch(() =>
+          fetch('http://localhost:5000/api/admin/stock', {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token')}` }
+          })
+        );
+        
+        if (!response.ok) throw new Error('Failed to load stock');
+        
+        const data = await response.json();
+        const grid = document.getElementById('stock-grid');
+        
+        grid.innerHTML = data.stock.map(product => `
+          <div class="stock-card">
+            <h3>${product.name}</h3>
+            ${product.variants ? product.variants.map(variant => `
+              <div class="stock-form-group">
+                <label>${variant.name}</label>
+                <input type="number" min="0" value="${variant.stock}" onchange="updateStock('${product.name}', '${variant.name}', this.value)">
+              </div>
+            `).join('') : `
+              <div class="stock-form-group">
+                <label>Stock Level</label>
+                <input type="number" min="0" value="${product.stock}" onchange="updateStock('${product.name}', 'default', this.value)">
+              </div>
+            `}
+          </div>
+        `).join('');
+      } catch (error) {
+        document.getElementById('stock-grid').innerHTML = `<div class="empty-state">Error loading stock: ${error.message}</div>`;
+      }
+    }
+    
+    async function updateStock(productName, variant, newStock) {
+      const token = localStorage.getItem('admin_token');
+      
+      try {
+        const response = await fetch('http://127.0.0.1:5000/api/admin/update-stock', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          credentials: 'omit',
+          body: JSON.stringify({ productName, variant, stock: parseInt(newStock) })
+        }).catch(() =>
+          fetch('http://localhost:5000/api/admin/update-stock', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            credentials: 'omit',
+            body: JSON.stringify({ productName, variant, stock: parseInt(newStock) })
+          })
+        );
+        
+        if (response.ok) {
+          const msg = document.getElementById('stock-message');
+          msg.className = 'message success';
+          msg.textContent = 'Stock updated successfully!';
+          setTimeout(() => msg.className = 'message', 2000);
+        }
+      } catch (error) {
+        console.error('Error updating stock:', error);
+      }
+    }
+    
+    async function loadRevenue() {
+      const token = localStorage.getItem('admin_token');
+      
+      try {
+        const response = await fetch('http://127.0.0.1:5000/api/admin/stats', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).catch(() => 
+          fetch('http://localhost:5000/api/admin/stats', {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+        );
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            logout();
+            return;
+          }
+          throw new Error('Failed to load stats');
+        }
+        
+        const data = await response.json();
+        
+        // Update stats
+        document.getElementById('total-revenue').textContent = data.totalRevenue;
+        document.getElementById('total-orders').textContent = data.totalOrders;
+        
+        // Update top products
+        const topProductsList = document.getElementById('top-products');
+        if (data.topProducts && data.topProducts.length > 0) {
+          topProductsList.innerHTML = data.topProducts.map(product => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; border-bottom: 1px solid #e2e8f0;">
+              <span style="font-weight: 600; color: #0f172a;">${product.name}</span>
+              <span style="background: #e0f2fe; color: #0052cc; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600;">${product.sold} sold</span>
+            </div>
+          `).join('');
+        } else {
+          topProductsList.innerHTML = '<div class="empty-state">No sales data yet</div>';
+        }
+      } catch (error) {
+        document.getElementById('total-revenue').textContent = 'Error';
+        document.getElementById('total-orders').textContent = 'Error';
+        document.getElementById('top-products').innerHTML = `<div class="empty-state">Error loading stats: ${error.message}</div>`;
+      }
+    }
+  </script>
+</body>
+</html>

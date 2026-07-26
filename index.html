@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LEANr | Peptides & Wellness</title>
+    <meta
+      name="description"
+      content="LEANr brings clean, science-backed wellness support with peptides, daily rituals, and a modern shop experience."
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="disclaimer-banner" id="disclaimer-banner">
+      <p><strong>⚠️ RESEARCH ONLY:</strong> All products are for research purposes only and not intended for human consumption. Consult with a healthcare professional before use.</p>
+      <button class="banner-close" id="banner-close">&times;</button>
+    </div>
+
+    <!-- Discount Code Popup -->
+    <div class="discount-popup" id="discount-popup">
+      <div class="discount-popup-content">
+        <button class="popup-close" id="popup-close">&times;</button>
+        <div class="popup-header">🎉 Exclusive Offer</div>
+        <p class="popup-text">Get <strong>10% OFF</strong> all orders on LEANr</p>
+        <div class="discount-code-display">LEANR10</div>
+        <p class="popup-subtext">Use this code at checkout. Valid on all products.</p>
+      </div>
+    </div>
+
+    <header class="topbar">
+      <a class="brand" href="#home"><img src="logo.jpeg" alt="LEANr" class="logo-img" /></a>
+      <nav class="nav-links">
+        <a href="#shop">Shop</a>
+        <a href="#about">About</a>
+        <a href="#contact">Contact</a>
+      </nav>
+      <a class="cart-pill" href="cart.html">Cart <span id="cart-count">0</span></a>
+    </header>
+
+    <main id="home">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">ELEVATE. TRANSFORM. BECOME LEANr</p>
+          <h1>Premium peptide therapy for your wellness journey.</h1>
+          <p>
+            Science-backed peptides designed to support your health, vitality, and transformative goals.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#shop">Shop bestsellers</a>
+            <a class="btn btn-secondary" href="#about">Why LEANr</a>
+          </div>
+        </div>
+        <div class="hero-card" aria-label="Brand summary">
+          <h3>Daily ritual, simplified</h3>
+          <ul>
+            <li>Science-forward formulas</li>
+            <li>Gentle, daily wellness support</li>
+            <li>Fast, mobile-first shopping</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="about" class="section">
+        <div class="section-heading">
+          <p class="eyebrow">Why customers love LEANr</p>
+          <h2>Clean support for your healthiest routine.</h2>
+        </div>
+        <div class="feature-grid">
+          <article>
+            <h3>⚡ Simple routines</h3>
+            <p>Easy-to-follow wellness products that fit naturally into your life.</p>
+          </article>
+          <article>
+            <h3>� Refer & Save</h3>
+            <p>Share LEANr with a friend. When they order, you both get £10 off your next purchase.</p>
+          </article>
+          <article>
+            <h3>📦 Free next day delivery</h3>
+            <p>Free next day UK delivery on orders over £100. Quick ordering so you can focus on feeling your best.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="shop" class="section">
+        <div class="delivery-banner">
+          <p>✨ Free next day UK delivery on orders over £100</p>
+        </div>
+        <div class="section-heading">
+          <p class="eyebrow">Shop</p>
+          <h2>Premium peptide selection, ready to order.</h2>
+        </div>
+        <div class="product-grid">
+          <article class="product-card featured-product" data-modal="modal-retatrutide">
+            <span class="product-badge">In stock</span>
+            <h3>RETATRUTIDE</h3>
+            <p>Triple GIP/GLP-1/GCG receptor agonist. Supports weight management, appetite regulation, and metabolic health.</p>
+            <label class="select-label" for="strength-select">Select strength</label>
+            <select id="strength-select" class="strength-select">
+              <option value="100">20mg — £100</option>
+              <option value="130">40mg — £130</option>
+            </select>
+            <div class="product-meta">
+              <span id="price-display">£100</span>
+              <button class="add-btn" data-price="100">Add to cart</button>
+            </div>
+            <button class="view-info-btn">View info</button>
+          </article>
+
+          <article class="product-card" data-modal="modal-tirzepetide">
+            <span class="product-badge">In stock</span>
+            <h3>TIRZEPETIDE</h3>
+            <p>Dual GIP/GLP-1 receptor agonist. Researched for weight management, appetite control, and improved metabolic function.</p>
+            <label class="select-label" for="tirze-select">Select strength</label>
+            <select id="tirze-select" class="strength-select">
+              <option value="100">30mg — £100</option>
+              <option value="130">60mg — £130</option>
+            </select>
+            <div class="product-meta">
+              <span id="tirze-price">£100</span>
+              <button class="add-btn">Add to cart</button>
+            </div>
+            <button class="view-info-btn">View info</button>
+          </article>
+
+          <article class="product-card" data-modal="modal-mt1">
+            <span class="product-badge">In stock</span>
+            <h3>MT1</h3>
+            <p>Melanocyte-stimulating hormone peptide. Supports natural melanin production, tanning, and skin health. 10mg.</p>
+            <label class="select-label" for="mt1-select">Format</label>
+            <select id="mt1-select" class="strength-select">
+              <option value="30">Vial — £30</option>
+              <option value="40">Pen — £40</option>
+            </select>
+            <div class="product-meta">
+              <span id="mt1-price">£30</span>
+              <button class="add-btn">Add to cart</button>
+            </div>
+            <button class="view-info-btn">View info</button>
+          </article>
+
+          <article class="product-card" data-modal="modal-ghkcu">
+            <span class="product-badge">In stock</span>
+            <h3>GHK-CU</h3>
+            <p>Copper peptide studied for skin repair, collagen production, and tissue regeneration. 100mg.</p>
+            <label class="select-label" for="ghk-select">Format</label>
+            <select id="ghk-select" class="strength-select">
+              <option value="35">Vial — £35</option>
+              <option value="45">Pen — £45</option>
+            </select>
+            <div class="product-meta">
+              <span id="ghk-price">£35</span>
+              <button class="add-btn">Add to cart</button>
+            </div>
+            <button class="view-info-btn">View info</button>
+          </article>
+
+          <article class="product-card" data-modal="modal-klow">
+            <span class="product-badge">In stock</span>
+            <h3>KLOW PEN</h3>
+            <p>Advanced peptide blend combining four complementary peptides for recovery, performance, and overall wellness support.</p>
+            <div class="product-meta">
+              <span>£70</span>
+              <button class="add-btn">Add to cart</button>
+            </div>
+            <button class="view-info-btn">View info</button>
+          </article>
+
+          <article class="product-card" data-modal="modal-cagri">
+            <span class="product-badge">In stock</span>
+            <h3>CAGRI</h3>
+            <p>Amylin peptide that regulates appetite and promotes satiety. Studied for supporting weight management through natural mechanisms. 10mg.</p>
+            <div class="product-meta">
+              <span>£60</span>
+              <button class="add-btn">Add to cart</button>
+            </div>
+            <button class="view-info-btn">View info</button>
+          </article>
+        </div>
+      </section>
+
+      <section class="section testimonial-section">
+        <div class="section-heading">
+          <p class="eyebrow">Customer Reviews</p>
+          <h2>People are choosing LEANr to feel more aligned.</h2>
+        </div>
+        <div class="reviews-grid">
+          <div class="review-card" data-review-index="0">
+            <div class="review-header">
+              <div class="review-stars">★★★★★</div>
+              <span class="review-author">Sam</span>
+            </div>
+            <p class="review-text">"Ordered a 40mg Reta pen on Thursday this week, it came yesterday. Service and product is spot on, had 1mg yesterday and can feel it already. Will definitely be returning in the future, thank you!"</p>
+            <div class="review-meta">Verified Purchase</div>
+          </div>
+
+          <div class="review-card" data-review-index="1" style="display: none;">
+            <div class="review-header">
+              <div class="review-stars">★★★★★</div>
+              <span class="review-author">Jessica</span>
+            </div>
+            <p class="review-text">"Ordered my 40mg pen and came within two days. Lovely support for any questions asked. Lost nearly two stone within a month, very happy! This is my second month so will keep updating on my weight loss journey."</p>
+            <div class="review-meta">Verified Purchase</div>
+          </div>
+
+          <div class="review-card" data-review-index="2" style="display: none;">
+            <div class="review-header">
+              <div class="review-stars">★★★★★</div>
+              <span class="review-author">Paige</span>
+            </div>
+            <p class="review-text">"Ordered my 20mg Friday morning, it came Saturday. Can't fault the service from start to finish. Super informative and supportive, couldn't have given more reassurance if needed. Did my first dose yesterday and already feel it beginning to work. Can't wait for this journey, thank you again!"</p>
+            <div class="review-meta">Verified Purchase</div>
+          </div>
+
+          <div class="review-card" data-review-index="3" style="display: none;">
+            <div class="review-header">
+              <div class="review-stars">★★★★★</div>
+              <span class="review-author">Connor</span>
+            </div>
+            <p class="review-text">"Got mine today, only ordered yesterday. Great service, lots of questions answered too!"</p>
+            <div class="review-meta">Verified Purchase</div>
+          </div>
+
+          <div class="review-card" data-review-index="4" style="display: none;">
+            <div class="review-header">
+              <div class="review-stars">★★★★★</div>
+              <span class="review-author">Karen</span>
+            </div>
+            <p class="review-text">"Have received my order, so impressed with the ease of ordering and how quickly it came. Love the case that the pen came in—a definite 10 out of 10 from me and will be ordering again. A big shout out to the LEANr team for providing an excellent service!"</p>
+            <div class="review-meta">Verified Purchase</div>
+          </div>
+
+          <div class="review-card" data-review-index="5" style="display: none;">
+            <div class="review-header">
+              <div class="review-stars">★★★★★</div>
+              <span class="review-author">Kim</span>
+            </div>
+            <p class="review-text">"Thank you for my pens! So speedy and boxed perfectly. Amazing service!"</p>
+            <div class="review-meta">Verified Purchase</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer id="contact" class="footer">
+      <div class="footer-content">
+        <div class="footer-section">
+          <h3>Stay in the loop</h3>
+          <p>Get product drops, wellness tips, and special offers.</p>
+          <form class="signup-form">
+            <input type="email" placeholder="Enter your email" />
+            <button type="submit">Join</button>
+          </form>
+        </div>
+
+        <div class="footer-section">
+          <h3>About Peptides</h3>
+          <p>Peptides are short chains of amino acids that naturally occur in the body. They play crucial roles in various biological functions and are extensively studied in research for their potential therapeutic applications.</p>
+          <p><strong>Research-Backed Science:</strong> Our peptides are selected based on published scientific research and are intended for researchers and academic institutions.</p>
+        </div>
+
+        <div class="footer-section disclaimer-section">
+          <h3>⚠️ Important Legal Disclaimer</h3>
+          <p><strong>Research Only:</strong> All products sold by LEANr are for research purposes only and are not intended for human consumption. These products are not approved by any regulatory agency for human use.</p>
+          <p><strong>Not For Self-Administration:</strong> Users should not attempt to use these peptides on themselves. Always consult with qualified healthcare professionals and researchers.</p>
+          <p><strong>Medical Advice:</strong> Nothing on this site should be construed as medical advice. LEANr makes no claims about the efficacy of these products for treating, curing, or preventing any disease.</p>
+          <p><strong>Liability:</strong> LEANr is not liable for any adverse effects or injuries resulting from misuse, improper handling, or unauthorized consumption of these research products.</p>
+          <p style="font-size: 0.85rem; margin-top: 1rem;"><em>By purchasing from LEANr, you acknowledge that you understand these products are for research only and agree to use them in compliance with all applicable laws and regulations.</em></p>
+        </div>
+
+        <div class="footer-section">
+          <h3>Contact & Support</h3>
+          <p>For questions about our research peptides or to learn more about our products, please reach out to our team.</p>
+          <p><strong>Email:</strong> <a href="mailto:leanrwellness@gmail.com">leanrwellness@gmail.com</a></p>
+          <p style="margin-top: 1rem; font-size: 0.85rem;"><a href="login.html" style="color: #0052cc; text-decoration: none;">Admin Login</a></p>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <p>&copy; 2026 LEANr. All rights reserved. | Products are for research purposes only.</p>
+      </div>
+    </footer>
+
+    <!-- Product Detail Modals -->
+    <div id="modal-retatrutide" class="modal">
+      <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <div class="modal-poster">
+          <h2>RETATRUTIDE</h2>
+          <p class="subtitle">Triple GIP/GLP-1/GCG Receptor Agonist</p>
+          <div class="nutrition-guide">
+            <h3>Nutrition Guide While Taking Retatrutide</h3>
+            <p><strong>Eat Smart. Feel Better. Get Better Results.</strong></p>
+            <p>Your nutrition plays a huge role in how well Retatrutide works. Choosing the right foods can help reduce side effects, boost results, and support long-term health.</p>
+            
+            <div class="guide-section">
+              <h4>Foods to Focus On</h4>
+              <ul>
+                <li><strong>Lean Proteins:</strong> Chicken, turkey, fish, eggs, tofu, lean beef</li>
+                <li><strong>Vegetables:</strong> High in fibre, vitamins and minerals</li>
+                <li><strong>Healthy Fats:</strong> Avocado, nuts, seeds, olive oil</li>
+                <li><strong>High Fibre Carbs:</strong> Sweet potatoes, oats, quinoa, brown rice</li>
+                <li><strong>Hydrating Foods:</strong> Cucumber, watermelon, berries, citrus fruits</li>
+              </ul>
+            </div>
+
+            <div class="guide-section">
+              <h4>Foods to Limit or Avoid</h4>
+              <ul>
+                <li><strong>Fried & Fast Foods:</strong> Can worsen nausea and slow digestion</li>
+                <li><strong>Sugary Snacks & Desserts:</strong> Can cause energy crashes and cravings</li>
+                <li><strong>Alcohol:</strong> Can increase nausea and dehydration</li>
+                <li><strong>White Bread, Pasta & Rice:</strong> Can cause blood sugar spikes</li>
+                <li><strong>Carbonated & Sugary Drinks:</strong> Can increase bloating</li>
+              </ul>
+            </div>
+
+            <div class="guide-tips">
+              <p><strong>Protein Intake:</strong> Aim for 1.2–1.6g per kg of body weight daily</p>
+              <p><strong>Water Intake:</strong> Aim for 2–3 litres per day</p>
+              <p><strong>General Tips:</strong> Eat smaller, balanced meals. Listen to your body and don't overeat. Stay consistent and be patient.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-tirzepetide" class="modal">
+      <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <div class="modal-poster">
+          <h2>TIRZEPETIDE</h2>
+          <p class="subtitle">Dual GIP/GLP-1 Receptor Agonist</p>
+          <div class="tirzepetide-info">
+            <h3>About Tirzepetide</h3>
+            <p>Tirzepetide is a dual GIP/GLP-1 receptor agonist peptide being researched for its potential in supporting weight management, appetite control, and metabolic function. It works by activating receptors that help regulate glucose levels and satiety.</p>
+            
+            <div class="info-row">
+              <div class="info-box">
+                <h4>Key Benefits</h4>
+                <ul>
+                  <li>Supports Weight Management</li>
+                  <li>Promotes Appetite Control</li>
+                  <li>Improves Metabolic Function</li>
+                  <li>Blood Sugar Support</li>
+                  <li>Overall Wellness Support</li>
+                </ul>
+              </div>
+              <div class="info-box">
+                <h4>Recommended Usage</h4>
+                <ul>
+                  <li><strong>Dose:</strong> As prescribed by healthcare provider</li>
+                  <li><strong>Frequency:</strong> Once weekly injection</li>
+                  <li><strong>Duration:</strong> Consistent use for optimal results</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="info-row">
+              <div class="info-box">
+                <h4>Nutrition Considerations</h4>
+                <ul>
+                  <li>Maintain balanced, lean protein-rich diet</li>
+                  <li>Stay well-hydrated (2–3 litres daily)</li>
+                  <li>Eat smaller, more frequent meals</li>
+                  <li>Limit fried and processed foods</li>
+                </ul>
+              </div>
+              <div class="info-box">
+                <h4>Important Reminders</h4>
+                <ul>
+                  <li>Always consult with a healthcare provider</li>
+                  <li>Individual results may vary</li>
+                  <li>This is for educational purposes only</li>
+                  <li>Not for human consumption without supervision</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-ghkcu" class="modal">
+      <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <div class="modal-poster">
+          <h2>GHK-CU</h2>
+          <p class="subtitle">Copper Peptide - Skin Repair & Regeneration</p>
+          <div class="ghkcu-info">
+            <h3>About GHK-CU</h3>
+            <p>GHK-CU is a naturally occurring copper peptide studied for its potential role in supporting skin repair, collagen production, and tissue regeneration. It's popular in skincare and wellness routines.</p>
+            
+            <div class="info-row">
+              <div class="info-box">
+                <h4>Key Benefits</h4>
+                <ul>
+                  <li>Supports Skin Repair</li>
+                  <li>Promotes Collagen Production</li>
+                  <li>Supports Tissue Regeneration</li>
+                  <li>Antioxidant Properties</li>
+                  <li>Overall Skin Health</li>
+                </ul>
+              </div>
+              <div class="info-box">
+                <h4>Available Formats</h4>
+                <ul>
+                  <li><strong>Vial:</strong> £35 (100mg)</li>
+                  <li><strong>Pen:</strong> £45 (100mg, pre-filled)</li>
+                  <li>Both formats contain the same active ingredient</li>
+                  <li>Pen format offers convenient, ready-to-use option</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="info-row">
+              <div class="info-box">
+                <h4>Who Can Benefit?</h4>
+                <ul>
+                  <li>Those focused on skin health</li>
+                  <li>Recovery and regeneration support seekers</li>
+                  <li>Daily wellness routine enthusiasts</li>
+                  <li>Anyone maintaining healthy appearance</li>
+                </ul>
+              </div>
+              <div class="info-box">
+                <h4>Important Information</h4>
+                <ul>
+                  <li>For research and educational use</li>
+                  <li>Always consult healthcare professionals</li>
+                  <li>Individual results may vary</li>
+                  <li>Store properly as directed</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-cagri" class="modal">
+      <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <div class="modal-poster">
+          <h2>CAGRI</h2>
+          <p class="subtitle">Growth Hormone Secretagogue Peptide</p>
+          <div class="cagri-info">
+            <h3>About CAGRI</h3>
+            <p>CAGRI is a growth hormone secretagogue peptide being researched for its potential in supporting growth hormone release and overall wellness. It's designed to support natural growth hormone production.</p>
+            
+            <div class="info-row">
+              <div class="info-box">
+                <h4>Key Benefits</h4>
+                <ul>
+                  <li>Supports Growth Hormone Release</li>
+                  <li>Overall Wellness Support</li>
+                  <li>Metabolic Support</li>
+                  <li>Recovery Assistance</li>
+                  <li>Vitality & Energy Support</li>
+                </ul>
+              </div>
+              <div class="info-box">
+                <h4>Product Details</h4>
+                <ul>
+                  <li><strong>Strength:</strong> 10mg</li>
+                  <li><strong>Format:</strong> Vial</li>
+                  <li><strong>Price:</strong> £60</li>
+                  <li>In stock and ready to order</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="info-row">
+              <div class="info-box">
+                <h4>Ideal For</h4>
+                <ul>
+                  <li>Athletes and fitness enthusiasts</li>
+                  <li>Those seeking recovery support</li>
+                  <li>Wellness-focused individuals</li>
+                  <li>Anyone pursuing optimal health</li>
+                </ul>
+              </div>
+              <div class="info-box">
+                <h4>Important Information</h4>
+                <ul>
+                  <li>For educational purposes only</li>
+                  <li>Always consult healthcare providers</li>
+                  <li>Individual results may vary</li>
+                  <li>Not for human consumption</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-mt1" class="modal">
+      <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <div class="modal-poster mt1-poster">
+          <h2>MT1 PEPTIDE</h2>
+          <p class="subtitle">Tanning Peptide - Melanocyte Stimulating Hormone</p>
+          <div class="mt1-info">
+            <div class="info-row">
+              <div class="info-box">
+                <h4>Key Benefits</h4>
+                <ul>
+                  <li>Enhances Natural Tanning</li>
+                  <li>Skin Protection</li>
+                  <li>Anti-Aging Support</li>
+                  <li>Libido Support</li>
+                  <li>Recovery Support</li>
+                </ul>
+              </div>
+              <div class="info-box">
+                <h4>Recommended Usage</h4>
+                <ul>
+                  <li><strong>Dose:</strong> 250–500 mcg per day</li>
+                  <li><strong>Frequency:</strong> Daily subcutaneous injection</li>
+                  <li><strong>Best Results:</strong> Start 5–7 days before sun exposure</li>
+                </ul>
+              </div>
+            </div>
+            <div class="info-row">
+              <div class="info-box">
+                <h4>Injection Sites</h4>
+                <ul>
+                  <li><strong>Abdomen:</strong> Preferred site (2 inches from belly button)</li>
+                  <li><strong>Upper Arm:</strong> Back of arm fatty tissue</li>
+                  <li><strong>Thighs:</strong> Front of thigh, middle area</li>
+                  <li><strong>Upper Buttocks:</strong> Top outer area</li>
+                </ul>
+              </div>
+              <div class="info-box">
+                <h4>Important Tips</h4>
+                <ul>
+                  <li>Always wash hands before injecting</li>
+                  <li>Use a new needle for every injection</li>
+                  <li>Store in a cool, dry place 2–8°C</li>
+                  <li>Do not rub injection site after</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-klow" class="modal">
+      <div class="modal-content">
+        <button class="modal-close">&times;</button>
+        <div class="modal-poster klow-poster">
+          <h2>KLOW PEN</h2>
+          <p class="subtitle">Advanced Peptide Blend - Four Complementary Peptides</p>
+          <div class="klow-info">
+            <h3>What's Inside KLOW?</h3>
+            <div class="peptides-grid">
+              <div class="peptide-item">
+                <h4>BPC-157</h4>
+                <p>Studied for its potential to support tissue repair and aid in recovery</p>
+              </div>
+              <div class="peptide-item">
+                <h4>TB-500</h4>
+                <p>Research suggests it may help support tissue healing and promote flexibility</p>
+              </div>
+              <div class="peptide-item">
+                <h4>GHK-CU</h4>
+                <p>Copper peptide studied for skin repair, regeneration and overall wellness</p>
+              </div>
+              <div class="peptide-item">
+                <h4>KPV</h4>
+                <p>Being researched for its potential to support immune balance and recovery</p>
+              </div>
+            </div>
+
+            <h3>Potential Benefits</h3>
+            <ul>
+              <li>Supports Recovery</li>
+              <li>May Aid Healing</li>
+              <li>Supports Performance</li>
+              <li>Promotes Overall Wellness</li>
+              <li>Supports Skin Health</li>
+              <li>Helps Maintain Strength</li>
+            </ul>
+
+            <h3>Who Can Benefit?</h3>
+            <ul>
+              <li>Fitness Enthusiasts</li>
+              <li>Athletes</li>
+              <li>Recovery-Focused Individuals</li>
+              <li>Those Looking to Support Wellness</li>
+              <li>Anyone Pursuing a Healthier Lifestyle</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Contact Buttons -->
+    <div class="floating-buttons">
+      <a href="https://chat.whatsapp.com/I0OvnYe43XhIlszvDEuBgo?s=hd&p=i&ilr=4" target="_blank" class="floating-btn whatsapp-btn" title="Join WhatsApp Community">
+        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+      </a>
+      <a href="https://t.me/LEANrwellness" target="_blank" class="floating-btn telegram-btn" title="Join Telegram Channel">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.91 3.79L20.3 20.84c-.25 1.1-.98 1.86-2.04 1.86-.5 0-.98-.15-1.39-.4l-5.41-4.04-2.61 2.53c-.39.37-.88.56-1.39.56-.98 0-1.74-.75-1.74-1.73V15.7l11.87-15.16c.25-.25.12-.75-.25-.75-.12 0-.25.12-.37.25L6.41 14.63 2.64 13.04c-1.1-.5-1.36-1.49-1.1-2.23C1.89 10.07 2.75 9.32 3.98 9.07l17.3-3.95c.99-.25 1.97.5 1.64 2.6z"/></svg>
+      </a>
+    </div>
+
+    <!-- Cookie Consent Banner -->
+    <div class="cookie-consent" id="cookie-consent">
+      <div class="cookie-content">
+        <p>We use cookies to improve your experience on our site. By continuing to use our site, you agree to our use of cookies.</p>
+        <button id="cookie-accept" class="cookie-btn">Accept</button>
+        <button id="cookie-decline" class="cookie-btn secondary">Decline</button>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+  </body>
+</html>
