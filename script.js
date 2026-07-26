@@ -91,8 +91,7 @@ function initBannerClose() {
 
 // Fetch and update stock status
 function initStockStatus() {
-  fetch('http://127.0.0.1:5000/api/public/stock')
-    .catch(() => fetch('http://localhost:5000/api/public/stock'))
+  fetch(window.location.origin + '/api/public/stock')
     .then(res => res.json())
     .then(data => updateProductBadges(data.stock))
     .catch(err => console.log('Stock data unavailable'));
