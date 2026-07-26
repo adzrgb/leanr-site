@@ -175,17 +175,18 @@ function updateProductBadges(stockData) {
           const select = card.querySelector('select');
           if (select) {
             const selectedText = select.options[select.selectedIndex].text;
+            const variantName = selectedText.split(' — ')[0].trim();
             updateButtonForVariant(productName, selectedText, addBtn);
             
             // Update stock info based on product type
             if (productName === 'RETATRUTIDE') {
-              updateVariantStockInfo('RETATRUTIDE', 'reta-stock-info');
+              updateVariantStockInfo('RETATRUTIDE', 'reta-stock-info', variantName);
             } else if (productName === 'TIRZEPETIDE') {
-              updateVariantStockInfo('TIRZEPETIDE', 'tirze-stock-info');
+              updateVariantStockInfo('TIRZEPETIDE', 'tirze-stock-info', variantName);
             } else if (productName === 'MT1') {
-              updateVariantStockInfo('MT1', 'mt1-stock-info');
+              updateVariantStockInfo('MT1', 'mt1-stock-info', variantName);
             } else if (productName === 'GHK-CU') {
-              updateVariantStockInfo('GHK-CU', 'ghk-stock-info');
+              updateVariantStockInfo('GHK-CU', 'ghk-stock-info', variantName);
             }
           }
         }
@@ -235,8 +236,8 @@ function updateButtonForVariant(productName, selectedText, addButton) {
   }
 }
 
-// Update stock info display for products with variants
-function updateVariantStockInfo(productName, infoElementId) {
+// Update stock info display for the currently selected variant
+function updateVariantStockInfo(productName, infoElementId, selectedVariantName) {
   const infoEl = document.getElementById(infoElementId);
   if (!infoEl || !globalStockData || !Array.isArray(globalStockData)) {
     return;
@@ -248,29 +249,16 @@ function updateVariantStockInfo(productName, infoElementId) {
     return;
   }
   
-  // Check all variants' stock status
-  let infoText = '';
-  const outOfStock = [];
-  const inStock = [];
+  // Find the stock count for the selected variant
+  const selectedVariant = productData.variants.find(v => v.name === selectedVariantName);
   
-  productData.variants.forEach(v => {
-    if (v.stock > 0) {
-      inStock.push(`${v.name}: ${v.stock} left`);
+  if (selectedVariant) {
+    if (selectedVariant.stock > 0) {
+      infoEl.textContent = `${selectedVariantName}: ${selectedVariant.stock} left`;
     } else {
-      outOfStock.push(v.name);
+      infoEl.textContent = `${selectedVariantName}: Out of stock`;
     }
-  });
-  
-  // Show different messages based on stock situation
-  if (outOfStock.length > 0 && inStock.length > 0) {
-    // Some variants out of stock
-    infoText = `⚠️ ${outOfStock.join(', ')} out of stock • ${inStock.join(', ')} in stock`;
-  } else if (outOfStock.length === productData.variants.length) {
-    // All out of stock
-    infoText = '❌ All variants currently out of stock';
   }
-  
-  infoEl.textContent = infoText;
 }
 
 // Modal functionality
@@ -313,13 +301,14 @@ if (strengthSelect && priceDisplay) {
   strengthSelect.addEventListener('change', (event) => {
     const selectedValue = event.target.value;
     const selectedText = event.target.options[event.target.selectedIndex].text;
+    const variantName = selectedText.split(' — ')[0].trim();
     priceDisplay.textContent = `£${selectedValue}`;
     const addButton = document.querySelector('.featured-product .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
       addButton.dataset.option = selectedText;
       updateButtonForVariant('RETATRUTIDE', selectedText, addButton);
-      updateVariantStockInfo('RETATRUTIDE', 'reta-stock-info');
+      updateVariantStockInfo('RETATRUTIDE', 'reta-stock-info', variantName);
     }
   });
 }
@@ -332,14 +321,15 @@ if (tirzeSelect && tirzePrice) {
   tirzeSelect.addEventListener('change', (event) => {
     const selectedValue = event.target.value;
     const selectedText = event.target.options[event.target.selectedIndex].text;
+    const variantName = selectedText.split(' — ')[0].trim();
     tirzePrice.textContent = `£${selectedValue}`;
     const addButton = document.querySelector('[data-modal="modal-tirzepetide"] .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
       addButton.dataset.option = selectedText;
       updateButtonForVariant('TIRZEPETIDE', selectedText, addButton);
+      updateVariantStockInfo('TIRZEPETIDE', 'tirze-stock-info', variantName);
     }
-    updateVariantStockInfo('TIRZEPETIDE', 'tirze-stock-info');
   });
 }
 
@@ -351,12 +341,14 @@ if (mt1Select && mt1Price) {
   mt1Select.addEventListener('change', (event) => {
     const selectedValue = event.target.value;
     const selectedText = event.target.options[event.target.selectedIndex].text;
+    const variantName = selectedText.split(' — ')[0].trim();
     mt1Price.textContent = `£${selectedValue}`;
     const addButton = document.querySelector('[data-modal="modal-mt1"] .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
       addButton.dataset.option = selectedText;
       updateButtonForVariant('MT1', selectedText, addButton);
+      updateVariantStockInfo('MT1', 'mt1-stock-info', variantName);
     }
   });
 }
@@ -369,14 +361,15 @@ if (ghkSelect && ghkPrice) {
   ghkSelect.addEventListener('change', (event) => {
     const selectedValue = event.target.value;
     const selectedText = event.target.options[event.target.selectedIndex].text;
+    const variantName = selectedText.split(' — ')[0].trim();
     ghkPrice.textContent = `£${selectedValue}`;
     const addButton = document.querySelector('[data-modal="modal-ghkcu"] .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
       addButton.dataset.option = selectedText;
       updateButtonForVariant('GHK-CU', selectedText, addButton);
+      updateVariantStockInfo('GHK-CU', 'ghk-stock-info', variantName);
     }
-    updateVariantStockInfo('GHK-CU', 'ghk-stock-info');
   });
 }
 
