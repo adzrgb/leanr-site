@@ -322,6 +322,7 @@ def send_email(recipient, subject, html_body):
         else:
             print(f"    ✗ Email failed with status {response.status_code}")
             print(f"    Response: {response.text}\n")
+            raise Exception(f"Email API returned {response.status_code}: {response.text}")
         
     except Exception as e:
         import traceback
