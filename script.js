@@ -248,6 +248,11 @@ if (tirzeSelect && tirzePrice) {
   tirzeSelect.addEventListener('change', (event) => {
     const selectedValue = event.target.value;
     tirzePrice.textContent = `£${selectedValue}`;
+    const addButton = document.querySelector('[data-modal="modal-tirzepetide"] .add-btn');
+    if (addButton) {
+      addButton.dataset.price = selectedValue;
+      addButton.dataset.option = event.target.options[event.target.selectedIndex].text;
+    }
   });
 }
 
@@ -259,6 +264,11 @@ if (mt1Select && mt1Price) {
   mt1Select.addEventListener('change', (event) => {
     const selectedValue = event.target.value;
     mt1Price.textContent = `£${selectedValue}`;
+    const addButton = document.querySelector('[data-modal="modal-mt1"] .add-btn');
+    if (addButton) {
+      addButton.dataset.price = selectedValue;
+      addButton.dataset.option = event.target.options[event.target.selectedIndex].text;
+    }
   });
 }
 
@@ -270,6 +280,11 @@ if (ghkSelect && ghkPrice) {
   ghkSelect.addEventListener('change', (event) => {
     const selectedValue = event.target.value;
     ghkPrice.textContent = `£${selectedValue}`;
+    const addButton = document.querySelector('[data-modal="modal-ghkcu"] .add-btn');
+    if (addButton) {
+      addButton.dataset.price = selectedValue;
+      addButton.dataset.option = event.target.options[event.target.selectedIndex].text;
+    }
   });
 }
 
@@ -311,15 +326,16 @@ addButtons.forEach((button) => {
     
     if (stockItem) {
       if (Array.isArray(stockItem.variants)) {
-        // Check if any variant is in stock
-        isInStock = stockItem.variants.some(v => v.stock > 0);
+        // Check if the SELECTED variant is in stock
+        const selectedVariant = stockItem.variants.find(v => v.name === selectedOption);
+        isInStock = selectedVariant && selectedVariant.stock > 0;
       } else {
         isInStock = stockItem.stock > 0;
       }
     }
     
     if (!isInStock) {
-      alert('This item is currently out of stock');
+      alert(`${selectedOption || 'This item'} is currently out of stock`);
       return;
     }
     
