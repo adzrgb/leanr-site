@@ -694,6 +694,51 @@ def get_stats():
         print(f"ERROR: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+# ==================== STATIC FILE ROUTES ====================
+
+@app.route('/')
+def serve_index():
+    """Serve index.html"""
+    with open('index.html') as f:
+        return f.read()
+
+@app.route('/index.html')
+def serve_index_explicit():
+    """Serve index.html (explicit route)"""
+    with open('index.html') as f:
+        return f.read()
+
+@app.route('/cart.html')
+def serve_cart():
+    """Serve cart.html"""
+    with open('cart.html') as f:
+        return f.read()
+
+@app.route('/admin.html')
+def serve_admin():
+    """Serve admin.html"""
+    with open('admin.html') as f:
+        return f.read()
+
+# Serve CSS and JavaScript files
+@app.route('/styles.css')
+def serve_styles():
+    """Serve styles.css"""
+    with open('styles.css') as f:
+        return f.read(), 200, {'Content-Type': 'text/css'}
+
+@app.route('/script.js')
+def serve_script():
+    """Serve script.js"""
+    with open('script.js') as f:
+        return f.read(), 200, {'Content-Type': 'application/javascript'}
+
+@app.route('/cart-script.js')
+def serve_cart_script():
+    """Serve cart-script.js"""
+    with open('cart-script.js') as f:
+        return f.read(), 200, {'Content-Type': 'application/javascript'}
+
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     host = os.getenv('HOST', '127.0.0.1')
