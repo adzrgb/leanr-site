@@ -255,10 +255,11 @@ function updateVariantStockInfo(productName, infoElementId, selectedVariantName)
   const selectedVariant = productData.variants.find(v => v.name === selectedVariantName);
   
   if (selectedVariant) {
-    if (selectedVariant.stock > 0) {
+    // Only display stock count for low stock items (5 or fewer)
+    if (selectedVariant.stock > 0 && selectedVariant.stock <= 5) {
       infoEl.textContent = `${selectedVariantName}: ${selectedVariant.stock} left`;
     } else {
-      infoEl.textContent = `${selectedVariantName}: Out of stock`;
+      infoEl.textContent = '';
     }
   }
 }
@@ -276,15 +277,11 @@ function updateNonVariantStockInfo(productName, infoElementId) {
     return;
   }
   
-  // Display stock count for non-variant products
-  if (productData.stock > 0) {
-    if (productData.stock <= 5) {
-      infoEl.textContent = `${productData.stock} left`;
-    } else {
-      infoEl.textContent = `${productData.stock} in stock`;
-    }
+  // Only display stock count for low stock items (5 or fewer)
+  if (productData.stock > 0 && productData.stock <= 5) {
+    infoEl.textContent = `${productData.stock} left`;
   } else {
-    infoEl.textContent = 'Out of stock';
+    infoEl.textContent = '';
   }
 }
 
