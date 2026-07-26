@@ -125,39 +125,6 @@ function renderCart() {
   });
 }
 
-// Handle discount code application
-const discountBtn = document.getElementById('apply-discount-btn');
-const discountInput = document.getElementById('discount-code');
-const discountMessage = document.getElementById('discount-message');
-
-if (discountBtn) {
-  discountBtn.addEventListener('click', () => {
-    const code = discountInput.value.trim().toUpperCase();
-    
-    if (code === DISCOUNT_CODE) {
-      discountApplied = true;
-      discountMessage.textContent = '✓ Discount code applied! (10% off)';
-      discountMessage.style.color = '#10b981';
-      discountBtn.textContent = 'Applied';
-      discountBtn.disabled = true;
-      renderCart();
-    } else if (code === '') {
-      discountMessage.textContent = 'Please enter a code';
-      discountMessage.style.color = '#ef4444';
-    } else {
-      discountMessage.textContent = 'Invalid discount code';
-      discountMessage.style.color = '#ef4444';
-    }
-  });
-  
-  // Allow Enter key to apply discount
-  discountInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      discountBtn.click();
-    }
-  });
-}
-
 // Handle checkout form submission
 const checkoutForm = document.getElementById('checkout-form');
 if (checkoutForm) {
@@ -266,3 +233,50 @@ document.querySelector('.signup-form')?.addEventListener('submit', (event) => {
 // Initialize
 updateCartCount();
 renderCart();
+
+// Setup discount code handler AFTER DOM is ready
+function setupDiscountHandler() {
+  const discountBtn = document.getElementById('apply-discount-btn');
+  const discountInput = document.getElementById('discount-code');
+  const discountMessage = document.getElementById('discount-message');
+  
+  if (!discountBtn) {
+    console.warn('Discount button not found');
+    return;
+  }
+  
+  console.log('Discount handler setup: DISCOUNT_CODE=' + DISCOUNT_CODE);
+  
+  discountBtn.addEventListener('click', function() {
+    console.log('Apply button clicked');
+    const code = discountInput.value.trim().toUpperCase();
+    console.log('Entered code: ' + code);
+    
+    if (code === DISCOUNT_CODE) {
+      console.log('Valid discount code!');
+      discountApplied = true;
+      discountMessage.textContent = '✓ Discount code applied! (10% off)';
+      discountMessage.style.color = '#10b981';
+      discountBtn.textContent = 'Applied';
+      discountBtn.disabled = true;
+      renderCart();
+    } else if (code === '') {
+      discountMessage.textContent = 'Please enter a code';
+      discountMessage.style.color = '#ef4444';
+    } else {
+      console.log('Invalid code. Expected: ' + DISCOUNT_CODE + ' but got: ' + code);
+      discountMessage.textContent = 'Invalid discount code';
+      discountMessage.style.color = '#ef4444';
+    }
+  });
+  
+  // Allow Enter key to apply discount
+  discountInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      discountBtn.click();
+    }
+  });
+}
+
+// Call after a small delay to ensure DOM is ready
+setTimeout(setupDiscountHandler, 100);
