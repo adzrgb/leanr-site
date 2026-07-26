@@ -315,6 +315,36 @@ def verify_token(token):
     """Verify admin token"""
     return token in ADMIN_TOKENS
 
+@app.route('/login.html')
+def serve_login():
+    """Serve corrected login page"""
+    with open('login.html') as f:
+        html = f.read()
+    # Replace the entire problematic fetch block with corrected version
+    old_fetch = """const response = await fetch('http://127.0.0.1:5000/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'omit',
+          body: JSON.stringify({ username, password })
+        }).catch(() => 
+          fetch('http://localhost:5000/api/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'omit',
+            body: JSON.stringify({ username, password })
+          })
+        );"""
+    
+    new_fetch = """const response = await fetch(window.location.origin + '/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, password })
+        });"""
+    
+    html = html.replace(old_fetch, new_fetch)
+    return html
+
 @app.route('/api/admin/login', methods=['POST', 'OPTIONS'])
 def admin_login():
     """Admin login endpoint"""
