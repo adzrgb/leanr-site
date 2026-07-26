@@ -326,8 +326,10 @@ addButtons.forEach((button) => {
     
     if (stockItem) {
       if (Array.isArray(stockItem.variants)) {
+        // Extract variant name (remove price suffix like " — £130")
+        const variantName = selectedOption.split(' — ')[0].trim();
         // Check if the SELECTED variant is in stock
-        const selectedVariant = stockItem.variants.find(v => v.name === selectedOption);
+        const selectedVariant = stockItem.variants.find(v => v.name === variantName);
         isInStock = selectedVariant && selectedVariant.stock > 0;
       } else {
         isInStock = stockItem.stock > 0;
@@ -335,7 +337,8 @@ addButtons.forEach((button) => {
     }
     
     if (!isInStock) {
-      alert(`${selectedOption || 'This item'} is currently out of stock`);
+      const displayName = selectedOption.split(' — ')[0].trim() || 'This item';
+      alert(`${displayName} is currently out of stock`);
       return;
     }
     
