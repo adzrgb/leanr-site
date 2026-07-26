@@ -358,6 +358,11 @@ def admin_login():
         
         password_hash = hashlib.sha256(password.encode()).hexdigest()
         
+        # DEBUG: Log credentials
+        print(f"DEBUG: username={username}, ADMIN_USERNAME={ADMIN_USERNAME}")
+        print(f"DEBUG: password_hash={password_hash}")
+        print(f"DEBUG: ADMIN_PASSWORD_HASH={ADMIN_PASSWORD_HASH}")
+        
         if username == ADMIN_USERNAME and password_hash == ADMIN_PASSWORD_HASH:
             # Generate token
             token = secrets.token_urlsafe(32)
