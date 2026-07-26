@@ -15,21 +15,10 @@ load_dotenv()
 app = Flask(__name__)
 
 # CORS configuration - allow requests from localhost and production
-allowed_origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://leanr-site.replit.dev",  # Replit default URL
-    "https://leanr-site--leanrwellness.replit.app",  # Replit new format
-]
-
-# Add custom domain if provided
-custom_domain = os.getenv("CUSTOM_DOMAIN")
-if custom_domain:
-    allowed_origins.append(f"https://{custom_domain}")
-
+# For debugging: allow all origins
 CORS(app, resources={
     r"/api/*": {
-        "origins": allowed_origins,
+        "origins": "*",
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }
