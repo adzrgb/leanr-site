@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, Email, Content, To
+from resend import Resend
 from datetime import datetime
 import json
 import os
@@ -26,12 +25,12 @@ CORS(app, resources={
 
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
 print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}")
-print(f"DEBUG: SendGrid API Key present: {'Yes' if SENDGRID_API_KEY else 'No - will use API key from environment'}")
+print(f"DEBUG: Resend API Key present: {'Yes' if RESEND_API_KEY else 'No - will use API key from environment'}")
 
 # Admin credentials
 ADMIN_USERNAME = "admin"
@@ -282,28 +281,26 @@ def send_order_emails(data, items_html):
         print(traceback.format_exc())
 
 def send_email(recipient, subject, html_body):
-    """Send email via SendGrid API"""
+    """Send email via Resend API"""
     try:
         print(f"\n  → Sending email to {recipient}...")
         print(f"    Subject: {subject}")
         
-        if not SENDGRID_API_KEY:
-            raise Exception("SENDGRID_API_KEY environment variable not set")
+        if not RESEND_API_KEY:
+            raise Exception("RESEND_API_KEY environment variable not set")
         
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        client = Resend(api_key=RESEND_API_KEY)
         
-        message = Mail(
-            from_email=Email(BUSINESS_EMAIL, "LEANr Wellness"),
-            to_emails=To(recipient),
-            subject=subject,
-            html_content=html_body
-        )
-        
-        print(f"    Sending via SendGrid API...")
-        response = sg.send(message)
+        print(f"    Sending via Resend API...")
+        response = client.emails.send({
+            "from": f"LEANr Wellness <{BUSINESS_EMAIL}>",
+            "to": recipient,
+            "subject": subject,
+            "html": html_body,
+        })
         
         print(f"    ✓ Email sent successfully to {recipient}")
-        print(f"    Response status: {response.status_code}\n")
+        print(f"    Response ID: {response.get('id', 'N/A')}\n")
         
     except Exception as e:
         import traceback
