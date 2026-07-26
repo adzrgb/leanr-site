@@ -169,6 +169,15 @@ function updateProductBadges(stockData) {
           warning.textContent = `Only ${lowestStock} left!`;
           card.appendChild(warning);
         }
+        
+        // For products with variants, check the currently selected variant
+        if (Array.isArray(productItem.variants) && addBtn) {
+          const select = card.querySelector('select');
+          if (select) {
+            const selectedText = select.options[select.selectedIndex].text;
+            updateButtonForVariant(productName, selectedText, addBtn);
+          }
+        }
       }
     }
   });
@@ -188,6 +197,31 @@ function updateCartCount() {
 
 function saveCart() {
   localStorage.setItem('leanr-cart', JSON.stringify(cart));
+}
+
+// Helper function to check variant stock and update button state
+function updateButtonForVariant(productName, selectedText, addButton) {
+  if (!addButton || !globalStockData || globalStockData.length === 0) {
+    return;
+  }
+  
+  const variantName = selectedText.split(' — ')[0].trim();
+  const productData = globalStockData.find(item => item.name === productName);
+  
+  if (productData && Array.isArray(productData.variants)) {
+    const selectedVariant = productData.variants.find(v => v.name === variantName);
+    if (selectedVariant && selectedVariant.stock > 0) {
+      addButton.disabled = false;
+      addButton.style.opacity = '1';
+      addButton.style.cursor = 'pointer';
+      addButton.textContent = 'Add to cart';
+    } else {
+      addButton.disabled = true;
+      addButton.style.opacity = '0.5';
+      addButton.style.cursor = 'not-allowed';
+      addButton.textContent = 'Out of Stock';
+    }
+  }
 }
 
 // Modal functionality
@@ -253,24 +287,7 @@ if (tirzeSelect && tirzePrice) {
     if (addButton) {
       addButton.dataset.price = selectedValue;
       addButton.dataset.option = selectedText;
-      
-      // Check if selected variant is in stock
-      const variantName = selectedText.split(' — ')[0].trim();
-      const tirzepetideData = globalStockData.find(item => item.name === 'TIRZEPETIDE');
-      if (tirzepetideData && Array.isArray(tirzepetideData.variants)) {
-        const selectedVariant = tirzepetideData.variants.find(v => v.name === variantName);
-        if (selectedVariant && selectedVariant.stock > 0) {
-          addButton.disabled = false;
-          addButton.style.opacity = '1';
-          addButton.style.cursor = 'pointer';
-          addButton.textContent = 'Add to cart';
-        } else {
-          addButton.disabled = true;
-          addButton.style.opacity = '0.5';
-          addButton.style.cursor = 'not-allowed';
-          addButton.textContent = 'Out of Stock';
-        }
-      }
+      updateButtonForVariant('TIRZEPETIDE', selectedText, addButton);
     }
   });
 }
@@ -288,24 +305,7 @@ if (mt1Select && mt1Price) {
     if (addButton) {
       addButton.dataset.price = selectedValue;
       addButton.dataset.option = selectedText;
-      
-      // Check if selected variant is in stock
-      const variantName = selectedText.split(' — ')[0].trim();
-      const mt1Data = globalStockData.find(item => item.name === 'MT1');
-      if (mt1Data && Array.isArray(mt1Data.variants)) {
-        const selectedVariant = mt1Data.variants.find(v => v.name === variantName);
-        if (selectedVariant && selectedVariant.stock > 0) {
-          addButton.disabled = false;
-          addButton.style.opacity = '1';
-          addButton.style.cursor = 'pointer';
-          addButton.textContent = 'Add to cart';
-        } else {
-          addButton.disabled = true;
-          addButton.style.opacity = '0.5';
-          addButton.style.cursor = 'not-allowed';
-          addButton.textContent = 'Out of Stock';
-        }
-      }
+      updateButtonForVariant('MT1', selectedText, addButton);
     }
   });
 }
@@ -323,24 +323,7 @@ if (ghkSelect && ghkPrice) {
     if (addButton) {
       addButton.dataset.price = selectedValue;
       addButton.dataset.option = selectedText;
-      
-      // Check if selected variant is in stock
-      const variantName = selectedText.split(' — ')[0].trim();
-      const ghkData = globalStockData.find(item => item.name === 'GHK-CU');
-      if (ghkData && Array.isArray(ghkData.variants)) {
-        const selectedVariant = ghkData.variants.find(v => v.name === variantName);
-        if (selectedVariant && selectedVariant.stock > 0) {
-          addButton.disabled = false;
-          addButton.style.opacity = '1';
-          addButton.style.cursor = 'pointer';
-          addButton.textContent = 'Add to cart';
-        } else {
-          addButton.disabled = true;
-          addButton.style.opacity = '0.5';
-          addButton.style.cursor = 'not-allowed';
-          addButton.textContent = 'Out of Stock';
-        }
-      }
+      updateButtonForVariant('GHK-CU', selectedText, addButton);
     }
   });
 }
