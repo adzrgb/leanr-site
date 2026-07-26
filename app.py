@@ -287,7 +287,11 @@ def send_email(recipient, subject, html_body):
         print(f"    Subject: {subject}")
         
         if not RESEND_API_KEY:
-            raise Exception("RESEND_API_KEY environment variable not set")
+            print(f"    ⚠ WARNING: RESEND_API_KEY not configured yet")
+            print(f"    → Email QUEUED but not sent (API key missing)")
+            print(f"    → To: {recipient}")
+            print(f"    → Add RESEND_API_KEY to Render environment variables to enable email delivery")
+            return  # Gracefully continue without sending
         
         client = Resend(api_key=RESEND_API_KEY)
         
