@@ -247,11 +247,30 @@ const tirzePrice = document.getElementById('tirze-price');
 if (tirzeSelect && tirzePrice) {
   tirzeSelect.addEventListener('change', (event) => {
     const selectedValue = event.target.value;
+    const selectedText = event.target.options[event.target.selectedIndex].text;
     tirzePrice.textContent = `£${selectedValue}`;
     const addButton = document.querySelector('[data-modal="modal-tirzepetide"] .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
-      addButton.dataset.option = event.target.options[event.target.selectedIndex].text;
+      addButton.dataset.option = selectedText;
+      
+      // Check if selected variant is in stock
+      const variantName = selectedText.split(' — ')[0].trim();
+      const tirzepetideData = globalStockData.find(item => item.name === 'TIRZEPETIDE');
+      if (tirzepetideData && Array.isArray(tirzepetideData.variants)) {
+        const selectedVariant = tirzepetideData.variants.find(v => v.name === variantName);
+        if (selectedVariant && selectedVariant.stock > 0) {
+          addButton.disabled = false;
+          addButton.style.opacity = '1';
+          addButton.style.cursor = 'pointer';
+          addButton.textContent = 'Add to cart';
+        } else {
+          addButton.disabled = true;
+          addButton.style.opacity = '0.5';
+          addButton.style.cursor = 'not-allowed';
+          addButton.textContent = 'Out of Stock';
+        }
+      }
     }
   });
 }
@@ -263,11 +282,30 @@ const mt1Price = document.getElementById('mt1-price');
 if (mt1Select && mt1Price) {
   mt1Select.addEventListener('change', (event) => {
     const selectedValue = event.target.value;
+    const selectedText = event.target.options[event.target.selectedIndex].text;
     mt1Price.textContent = `£${selectedValue}`;
     const addButton = document.querySelector('[data-modal="modal-mt1"] .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
-      addButton.dataset.option = event.target.options[event.target.selectedIndex].text;
+      addButton.dataset.option = selectedText;
+      
+      // Check if selected variant is in stock
+      const variantName = selectedText.split(' — ')[0].trim();
+      const mt1Data = globalStockData.find(item => item.name === 'MT1');
+      if (mt1Data && Array.isArray(mt1Data.variants)) {
+        const selectedVariant = mt1Data.variants.find(v => v.name === variantName);
+        if (selectedVariant && selectedVariant.stock > 0) {
+          addButton.disabled = false;
+          addButton.style.opacity = '1';
+          addButton.style.cursor = 'pointer';
+          addButton.textContent = 'Add to cart';
+        } else {
+          addButton.disabled = true;
+          addButton.style.opacity = '0.5';
+          addButton.style.cursor = 'not-allowed';
+          addButton.textContent = 'Out of Stock';
+        }
+      }
     }
   });
 }
@@ -279,11 +317,30 @@ const ghkPrice = document.getElementById('ghk-price');
 if (ghkSelect && ghkPrice) {
   ghkSelect.addEventListener('change', (event) => {
     const selectedValue = event.target.value;
+    const selectedText = event.target.options[event.target.selectedIndex].text;
     ghkPrice.textContent = `£${selectedValue}`;
     const addButton = document.querySelector('[data-modal="modal-ghkcu"] .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
-      addButton.dataset.option = event.target.options[event.target.selectedIndex].text;
+      addButton.dataset.option = selectedText;
+      
+      // Check if selected variant is in stock
+      const variantName = selectedText.split(' — ')[0].trim();
+      const ghkData = globalStockData.find(item => item.name === 'GHK-CU');
+      if (ghkData && Array.isArray(ghkData.variants)) {
+        const selectedVariant = ghkData.variants.find(v => v.name === variantName);
+        if (selectedVariant && selectedVariant.stock > 0) {
+          addButton.disabled = false;
+          addButton.style.opacity = '1';
+          addButton.style.cursor = 'pointer';
+          addButton.textContent = 'Add to cart';
+        } else {
+          addButton.disabled = true;
+          addButton.style.opacity = '0.5';
+          addButton.style.cursor = 'not-allowed';
+          addButton.textContent = 'Out of Stock';
+        }
+      }
     }
   });
 }
@@ -292,9 +349,8 @@ addButtons.forEach((button) => {
   button.addEventListener('click', (e) => {
     e.stopPropagation();
     
-    // Check if item is in stock
+    // If button is disabled, do nothing (item is out of stock)
     if (button.disabled) {
-      alert('This item is currently out of stock');
       return;
     }
     
@@ -318,28 +374,6 @@ addButtons.forEach((button) => {
     if (price === 0) {
       const priceText = productCard.querySelector('.product-meta span').textContent;
       price = parseInt(priceText.replace('£', ''));
-    }
-    
-    // Verify item is in stock before adding
-    const stockItem = globalStockData.find(item => item.name === productName);
-    let isInStock = false;
-    
-    if (stockItem) {
-      if (Array.isArray(stockItem.variants)) {
-        // Extract variant name (remove price suffix like " — £130")
-        const variantName = selectedOption.split(' — ')[0].trim();
-        // Check if the SELECTED variant is in stock
-        const selectedVariant = stockItem.variants.find(v => v.name === variantName);
-        isInStock = selectedVariant && selectedVariant.stock > 0;
-      } else {
-        isInStock = stockItem.stock > 0;
-      }
-    }
-    
-    if (!isInStock) {
-      const displayName = selectedOption.split(' — ')[0].trim() || 'This item';
-      alert(`${displayName} is currently out of stock`);
-      return;
     }
     
     const product = {
