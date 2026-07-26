@@ -221,6 +221,30 @@ img {
   align-items: center;
 }
 
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.logo-home {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.logo-home:hover {
+  transform: scale(1.05);
+  opacity: 0.8;
+}
+
+.logo-img-right {
+  height: 2rem;
+  width: auto;
+}
+
 .nav-links {
   display: flex;
   gap: 0.9rem;

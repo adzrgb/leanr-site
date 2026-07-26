@@ -45,6 +45,24 @@
     .logout-btn:hover {
       background: #b91c1c;
     }
+
+    .logo-admin-link {
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    .logo-admin-link:hover {
+      transform: scale(1.05);
+      opacity: 0.8;
+    }
+
+    .logo-img-admin {
+      height: 2rem;
+      width: auto;
+    }
     
     .tabs {
       display: flex;
@@ -293,6 +311,7 @@
 <body>
   <div class="admin-container">
     <div class="admin-header">
+      <a class="logo-admin-link" href="index.html"><img src="logo.jpeg" alt="LEANr" class="logo-img-admin" /></a>
       <h1>LEANr Admin Dashboard</h1>
       <button class="logout-btn" onclick="logout()">Logout</button>
     </div>
