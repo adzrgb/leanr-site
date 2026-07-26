@@ -176,6 +176,17 @@ function updateProductBadges(stockData) {
           if (select) {
             const selectedText = select.options[select.selectedIndex].text;
             updateButtonForVariant(productName, selectedText, addBtn);
+            
+            // Update stock info based on product type
+            if (productName === 'RETATRUTIDE') {
+              updateVariantStockInfo('RETATRUTIDE', 'reta-stock-info');
+            } else if (productName === 'TIRZEPETIDE') {
+              updateVariantStockInfo('TIRZEPETIDE', 'tirze-stock-info');
+            } else if (productName === 'MT1') {
+              updateVariantStockInfo('MT1', 'mt1-stock-info');
+            } else if (productName === 'GHK-CU') {
+              updateVariantStockInfo('GHK-CU', 'ghk-stock-info');
+            }
           }
         }
       }
@@ -224,6 +235,43 @@ function updateButtonForVariant(productName, selectedText, addButton) {
   }
 }
 
+// Update stock info display for products with variants
+function updateVariantStockInfo(productName, infoElementId) {
+  const infoEl = document.getElementById(infoElementId);
+  if (!infoEl || !globalStockData || globalStockData.length === 0) {
+    return;
+  }
+  
+  const productData = globalStockData.find(item => item.name === productName);
+  if (!productData || !Array.isArray(productData.variants)) {
+    return;
+  }
+  
+  // Check all variants' stock status
+  let infoText = '';
+  const outOfStock = [];
+  const inStock = [];
+  
+  productData.variants.forEach(v => {
+    if (v.stock > 0) {
+      inStock.push(`${v.name} (${v.stock} left)`);
+    } else {
+      outOfStock.push(v.name);
+    }
+  });
+  
+  // Show different messages based on stock situation
+  if (outOfStock.length > 0 && inStock.length > 0) {
+    // Some variants out of stock
+    infoText = `⚠️ ${outOfStock.join(', ')} out of stock • ${inStock.join(', ')} available`;
+  } else if (outOfStock.length === productData.variants.length) {
+    // All out of stock
+    infoText = '❌ All variants currently out of stock';
+  }
+  
+  infoEl.textContent = infoText;
+}
+
 // Modal functionality
 viewInfoButtons.forEach((button) => {
   button.addEventListener('click', (e) => {
@@ -263,13 +311,14 @@ const priceDisplay = document.getElementById('price-display');
 if (strengthSelect && priceDisplay) {
   strengthSelect.addEventListener('change', (event) => {
     const selectedValue = event.target.value;
+    const selectedText = event.target.options[event.target.selectedIndex].text;
     priceDisplay.textContent = `£${selectedValue}`;
     const addButton = document.querySelector('.featured-product .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
-      addButton.dataset.option = event.target.options[event.target.selectedIndex].text;
-      addButton.textContent = 'Add to cart';
-      addButton.disabled = false;
+      addButton.dataset.option = selectedText;
+      updateButtonForVariant('RETATRUTIDE', selectedText, addButton);
+      updateVariantStockInfo('RETATRUTIDE', 'reta-stock-info');
     }
   });
 }
@@ -289,6 +338,7 @@ if (tirzeSelect && tirzePrice) {
       addButton.dataset.option = selectedText;
       updateButtonForVariant('TIRZEPETIDE', selectedText, addButton);
     }
+    updateVariantStockInfo('TIRZEPETIDE', 'tirze-stock-info');
   });
 }
 
@@ -325,6 +375,7 @@ if (ghkSelect && ghkPrice) {
       addButton.dataset.option = selectedText;
       updateButtonForVariant('GHK-CU', selectedText, addButton);
     }
+    updateVariantStockInfo('GHK-CU', 'ghk-stock-info');
   });
 }
 
