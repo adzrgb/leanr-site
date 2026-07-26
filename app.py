@@ -19,6 +19,7 @@ allowed_origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://leanr-site.replit.dev",  # Replit default URL
+    "https://leanr-site--leanrwellness.replit.app",  # Replit new format
 ]
 
 # Add custom domain if provided
