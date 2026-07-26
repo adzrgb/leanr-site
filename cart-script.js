@@ -209,18 +209,10 @@ document.querySelector('.signup-form')?.addEventListener('submit', (event) => {
   if (!email) return;
   
   // Save to backend
-  fetch('http://127.0.0.1:5000/api/newsletter/subscribe', {
+  fetch(window.location.origin + '/api/newsletter/subscribe', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'omit',
     body: JSON.stringify({ email })
-  }).catch(() => {
-    return fetch('http://localhost:5000/api/newsletter/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'omit',
-      body: JSON.stringify({ email })
-    });
   }).then(() => {
     input.value = '';
     alert('Thanks for joining LEANr. Check your email for exclusive offers!');

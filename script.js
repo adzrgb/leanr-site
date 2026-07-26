@@ -89,11 +89,17 @@ function initBannerClose() {
   }
 }
 
+// Global stock data
+let globalStockData = {};
+
 // Fetch and update stock status
 function initStockStatus() {
   fetch(window.location.origin + '/api/public/stock')
     .then(res => res.json())
-    .then(data => updateProductBadges(data.stock))
+    .then(data => {
+      globalStockData = data.stock;
+      updateProductBadges(data.stock);
+    })
     .catch(err => console.log('Stock data unavailable'));
 }
 
@@ -111,16 +117,34 @@ function updateProductBadges(stockData) {
   document.querySelectorAll('.product-card').forEach(card => {
     const productName = card.querySelector('h3')?.textContent?.trim();
     const badge = card.querySelector('.product-badge');
+    const addBtn = card.querySelector('.add-btn');
     
     if (badge && productName && stockMap.hasOwnProperty(productName)) {
       if (stockMap[productName]) {
         badge.textContent = 'In stock';
         badge.style.backgroundColor = '#10b981';
         badge.style.color = 'white';
+        // Enable button for in-stock items
+        if (addBtn) {
+          addBtn.disabled = false;
+          addBtn.style.opacity = '1';
+          addBtn.style.cursor = 'pointer';
+          // Reset text to 'Add to cart' if it was showing 'Out of Stock'
+          if (addBtn.textContent === 'Out of Stock') {
+            addBtn.textContent = 'Add to cart';
+          }
+        }
       } else {
         badge.textContent = 'Out of stock';
         badge.style.backgroundColor = '#dc2626';
         badge.style.color = 'white';
+        // Disable button for out-of-stock items
+        if (addBtn) {
+          addBtn.disabled = true;
+          addBtn.style.opacity = '0.5';
+          addBtn.style.cursor = 'not-allowed';
+          addBtn.textContent = 'Out of Stock';
+        }
       }
       
       // Add low stock warning
@@ -253,8 +277,15 @@ if (ghkSelect && ghkPrice) {
 addButtons.forEach((button) => {
   button.addEventListener('click', (e) => {
     e.stopPropagation();
+    
+    // Check if item is in stock
+    if (button.disabled) {
+      alert('This item is currently out of stock');
+      return;
+    }
+    
     const productCard = button.closest('.product-card');
-    const productName = productCard.querySelector('h3').textContent;
+    const productName = productCard.querySelector('h3').textContent.trim();
     
     // Get the selected option if available
     let selectedOption = '';
@@ -273,6 +304,24 @@ addButtons.forEach((button) => {
     if (price === 0) {
       const priceText = productCard.querySelector('.product-meta span').textContent;
       price = parseInt(priceText.replace('£', ''));
+    }
+    
+    // Verify item is in stock before adding
+    const stockItem = globalStockData.find(item => item.name === productName);
+    let isInStock = false;
+    
+    if (stockItem) {
+      if (Array.isArray(stockItem.variants)) {
+        // Check if any variant is in stock
+        isInStock = stockItem.variants.some(v => v.stock > 0);
+      } else {
+        isInStock = stockItem.stock > 0;
+      }
+    }
+    
+    if (!isInStock) {
+      alert('This item is currently out of stock');
+      return;
     }
     
     const product = {
@@ -309,18 +358,10 @@ document.querySelector('.signup-form')?.addEventListener('submit', (event) => {
   if (!email) return;
   
   // Save to backend
-  fetch('http://127.0.0.1:5000/api/newsletter/subscribe', {
+  fetch(window.location.origin + '/api/newsletter/subscribe', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'omit',
     body: JSON.stringify({ email })
-  }).catch(() => {
-    return fetch('http://localhost:5000/api/newsletter/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'omit',
-      body: JSON.stringify({ email })
-    });
   }).then(() => {
     input.value = '';
     alert('Thanks for joining LEANr. Check your email for exclusive offers!');
