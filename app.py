@@ -9,6 +9,7 @@ import os
 import secrets
 import hashlib
 from dotenv import load_dotenv
+import threading
 
 load_dotenv()
 
@@ -94,9 +95,62 @@ def send_order():
             </tr>
             """
         
-        total = data['subtotal']
+        # Save order to JSON file FIRST
+        orders = []
+        if os.path.exists(ORDERS_FILE):
+            with open(ORDERS_FILE, 'r') as f:
+                orders = json.load(f)
         
-        # Create HTML email for business
+        order_record = {
+            'orderNumber': data['orderNumber'],
+            'customerName': data['customerName'],
+            'customerEmail': data['customerEmail'],
+            'customerPhone': data['customerPhone'],
+            'deliveryAddress': data['deliveryAddress'],
+            'city': data['city'],
+            'postcode': data['postcode'],
+            'orderNotes': data.get('orderNotes', ''),
+            'items': data['items'],
+            'subtotal': data['subtotal'],
+            'discountAmount': data.get('discountAmount', 0),
+            'discountCode': data.get('discountCode', None),
+            'postage': data.get('postage', 0),
+            'total': data.get('total', data['subtotal']),
+            'timestamp': data['timestamp'],
+            'paymentConfirmed': False
+        }
+        
+        orders.append(order_record)
+        with open(ORDERS_FILE, 'w') as f:
+            json.dump(orders, f, indent=2)
+        
+        print(f"✓ Order saved to database")
+        
+        # Return success immediately - don't wait for emails
+        result = jsonify({'success': True, 'orderNumber': data['orderNumber']})
+        
+        # Send emails in background thread (non-blocking)
+        def send_emails_background():
+            try:
+                send_order_emails(data, items_html)
+            except Exception as e:
+                print(f"✗ Background email error: {str(e)}")
+        
+        email_thread = threading.Thread(target=send_emails_background, daemon=True)
+        email_thread.start()
+        
+        return result, 200
+    
+    except Exception as e:
+        import traceback
+        print(f"ERROR: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+def send_order_emails(data, items_html):
+    """Send order confirmation emails"""
+    try:
+        # Business email body
         business_email_body = f"""
         <html>
             <head>
@@ -127,9 +181,7 @@ def send_order():
                     
                     <div class="order-details">
                         <h3>Delivery Address</h3>
-                        <p>{data['deliveryAddress']}<br>
-                           {data['city']}<br>
-                           {data['postcode']}</p>
+                        <p>{data['deliveryAddress']}<br>{data['city']}<br>{data['postcode']}</p>
                     </div>
                     
                     <h3>Order Items</h3>
@@ -149,16 +201,12 @@ def send_order():
                             Total: £{data.get('total', data.get('subtotal', 0)):.2f}
                         </div>
                     </div>
-                    
-                    <p style="margin-top: 30px; color: #666;">
-                        Customer will receive a separate confirmation email with payment details.
-                    </p>
                 </div>
             </body>
         </html>
         """
         
-        # Create HTML email for customer
+        # Customer email body
         customer_email_body = f"""
         <html>
             <head>
@@ -174,131 +222,39 @@ def send_order():
                 </style>
             </head>
             <body>
-                <div class="header">
-                    <h1>LEANr Order Confirmation</h1>
-                </div>
+                <div class="header"><h1>LEANr Order Confirmation</h1></div>
                 <div class="content">
                     <p>Hi {data['customerName']},</p>
-                    <p>Thank you for your order! Here are your order details:</p>
-                    
+                    <p>Thank you for your order!</p>
                     <h2>Order Number: {data['orderNumber']}</h2>
-                    <p>Order Date: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}</p>
-                    
                     <div class="order-details">
-                        <h3>Delivery Address</h3>
-                        <p>{data['deliveryAddress']}<br>
-                           {data['city']}<br>
-                           {data['postcode']}</p>
+                        <p>{data['deliveryAddress']}<br>{data['city']}<br>{data['postcode']}</p>
                     </div>
-                    
-                    <h3>Order Items</h3>
                     <table>
-                        <th>Product</th>
-                        <th>Option</th>
-                        <th>Qty</th>
-                        <th>Total</th>
+                        <th>Product</th><th>Option</th><th>Qty</th><th>Total</th>
                         {items_html}
                     </table>
-                    
                     <div style="text-align: right; margin: 20px 0;">
                         <p><strong>Subtotal:</strong> £{data.get('subtotal', 0):.2f}</p>
-                        {f"<p style='color: #10b981;'><strong>Discount ({data.get('discountCode', 'N/A')}):</strong> -£{data.get('discountAmount', 0):.2f}</p>" if data.get('discountAmount', 0) > 0 else ""}
+                        {f"<p style='color: #10b981;'><strong>Discount:</strong> -£{data.get('discountAmount', 0):.2f}</p>" if data.get('discountAmount', 0) > 0 else ""}
                         <p><strong>Postage:</strong> £{data.get('postage', 0):.2f}</p>
-                        <div class="total" style="border-top: 2px solid #0052cc; padding-top: 10px;">
-                            Total: £{data.get('total', data.get('subtotal', 0)):.2f}
-                        </div>
+                        <div class="total">Total: £{data.get('total', data.get('subtotal', 0)):.2f}</div>
                     </div>
-                    
                     <div class="payment-section">
                         <h3>Payment Information</h3>
-                        <p><strong>Payment Options:</strong></p>
-                        
-                        <p><strong>Option 1: PayPal</strong><br>
-                        PayPal: <strong>leanrwellness@gmail.com</strong></p>
-                        
-                        <p style="margin-left: 20px; font-size: 14px;">
-                            <strong>Friends and Family:</strong> No fees, fastest option. Use this if you're comfortable with no buyer protection.<br><br>
-                            <strong>Goods and Services:</strong> Includes buyer protection. <u>If you choose this option, you MUST add the PayPal fee to your payment or your order will be refunded.</u> The fee is typically 3.49% + £0.20 for UK transactions.
-                        </p>
-                        
-                        <p><strong>Option 2: Bank Transfer</strong></p>
-                        <p style="background: #f0f9ff; padding: 12px; border-radius: 4px; margin: 10px 0;">
-                            <strong>Account Name:</strong> A W<br>
-                            <strong>Sort Code:</strong> 23-01-20<br>
-                            <strong>Account Number:</strong> 13050648<br>
-                            <strong>Reference:</strong> {data['orderNumber'][-4:]} (last 4 digits of order number)
-                        </p>
-                        
-                        <p style="font-size: 13px; color: #666; margin: 10px 0;">
-                            <strong>⚠️ Important:</strong> You may receive a warning that the account name "A W" doesn't match your details. This is normal and expected - please proceed with the payment as normal. The transfer will go through without issue.
-                        </p>
-                        
-                        <p style="color: #ec4899; font-weight: bold;">⚠️ If paying by PayPal Goods and Services, the fee must be included in your payment or your order will be automatically refunded.</p>
-                        
-                        <p>If you have any questions, please reply to this email.</p>
+                        <p><strong>Option 1: PayPal</strong><br>leanrwellness@gmail.com</p>
+                        <p><strong>Option 2: Bank Transfer</strong><br>Sort: 23-01-20 | Account: 13050648<br>Reference: {data['orderNumber'][-4:]}</p>
                     </div>
-                    
-                    <p style="margin-top: 30px; color: #666; font-size: 12px;">
-                        ELEVATE. TRANSFORM. BECOME LEANr.<br>
-                        Thank you for your purchase!
-                    </p>
                 </div>
             </body>
         </html>
         """
         
-        # Send email to business
-        send_email(
-            BUSINESS_EMAIL,
-            f"New Order: {data['orderNumber']}",
-            business_email_body
-        )
-        
-        # Send confirmation email to customer
-        send_email(
-            data['customerEmail'],
-            f"Order Confirmation: {data['orderNumber']}",
-            customer_email_body
-        )
-        
-        # Save order to JSON file
-        orders = []
-        if os.path.exists(ORDERS_FILE):
-            with open(ORDERS_FILE, 'r') as f:
-                orders = json.load(f)
-        
-        order_record = {
-            'orderNumber': data['orderNumber'],
-            'customerName': data['customerName'],
-            'customerEmail': data['customerEmail'],
-            'customerPhone': data['customerPhone'],
-            'deliveryAddress': data['deliveryAddress'],
-            'city': data['city'],
-            'postcode': data['postcode'],
-            'orderNotes': data.get('orderNotes', ''),
-            'items': data['items'],
-            'subtotal': data['subtotal'],
-            'discountAmount': data.get('discountAmount', 0),
-            'discountCode': data.get('discountCode', None),
-            'postage': data.get('postage', 0),
-            'total': data.get('total', data['subtotal']),
-            'timestamp': data['timestamp'],
-            'trackingNumber': None
-        }
-        
-        orders.append(order_record)
-        with open(ORDERS_FILE, 'w') as f:
-            json.dump(orders, f, indent=2)
-        
-        print(f"✓ Order saved to database")
-        
-        return jsonify({'success': True, 'orderNumber': data['orderNumber']}), 200
-    
+        send_email(BUSINESS_EMAIL, f"New Order: {data['orderNumber']}", business_email_body)
+        send_email(data['customerEmail'], f"Order Confirmation: {data['orderNumber']}", customer_email_body)
+        print(f"✓ Emails sent successfully")
     except Exception as e:
-        import traceback
-        print(f"ERROR: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'success': False, 'error': str(e)}), 500
+        print(f"✗ Email sending failed: {str(e)}")
 
 def send_email(recipient, subject, html_body):
     try:
