@@ -141,8 +141,13 @@ def send_order():
                         {items_html}
                     </table>
                     
-                    <div class="total">
-                        Total: £{total:.2f}
+                    <div style="text-align: right; margin: 20px 0;">
+                        <p><strong>Subtotal:</strong> £{data.get('subtotal', 0):.2f}</p>
+                        {f"<p style='color: #10b981;'><strong>Discount ({data.get('discountCode', 'N/A')}):</strong> -£{data.get('discountAmount', 0):.2f}</p>" if data.get('discountAmount', 0) > 0 else ""}
+                        <p><strong>Postage:</strong> £{data.get('postage', 0):.2f}</p>
+                        <div class="total" style="border-top: 2px solid #0052cc; padding-top: 10px;">
+                            Total: £{data.get('total', data.get('subtotal', 0)):.2f}
+                        </div>
                     </div>
                     
                     <p style="margin-top: 30px; color: #666;">
@@ -195,8 +200,13 @@ def send_order():
                         {items_html}
                     </table>
                     
-                    <div class="total">
-                        Total: £{total:.2f}
+                    <div style="text-align: right; margin: 20px 0;">
+                        <p><strong>Subtotal:</strong> £{data.get('subtotal', 0):.2f}</p>
+                        {f"<p style='color: #10b981;'><strong>Discount ({data.get('discountCode', 'N/A')}):</strong> -£{data.get('discountAmount', 0):.2f}</p>" if data.get('discountAmount', 0) > 0 else ""}
+                        <p><strong>Postage:</strong> £{data.get('postage', 0):.2f}</p>
+                        <div class="total" style="border-top: 2px solid #0052cc; padding-top: 10px;">
+                            Total: £{data.get('total', data.get('subtotal', 0)):.2f}
+                        </div>
                     </div>
                     
                     <div class="payment-section">
@@ -259,6 +269,8 @@ def send_order():
             'orderNotes': data.get('orderNotes', ''),
             'items': data['items'],
             'subtotal': data['subtotal'],
+            'discountAmount': data.get('discountAmount', 0),
+            'discountCode': data.get('discountCode', None),
             'postage': data.get('postage', 0),
             'total': data.get('total', data['subtotal']),
             'timestamp': data['timestamp'],

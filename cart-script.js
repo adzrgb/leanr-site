@@ -89,11 +89,26 @@ function renderCart() {
     itemsList.appendChild(itemRow);
   });
   
-  // Calculate postage
-  const postage = subtotal < 100 ? 6 : 0;
-  const total = subtotal + postage;
+  // Calculate discount if applied
+  let discountAmount = 0;
+  if (discountApplied) {
+    discountAmount = subtotal * (DISCOUNT_PERCENT / 100);
+  }
   
-  // Update totals
+  // Calculate postage (£5 for orders under £100, free over £100)
+  const postage = subtotal < 100 ? 5 : 0;
+  const total = subtotal - discountAmount + postage;
+  
+  
+  // Update totals display
+  const discountRow = document.getElementById('discount-row');
+  if (discountApplied) {
+    discountRow.style.display = 'block';
+    document.getElementById('discount-amount').textContent = `-£${discountAmount.toFixed(2)}`;
+  } else {
+    discountRow.style.display = 'none';
+  }
+  
   document.getElementById('subtotal').textContent = `£${subtotal.toFixed(2)}`;
   document.getElementById('delivery').textContent = postage === 0 ? 'FREE' : `£${postage.toFixed(2)}`;
   document.getElementById('total').textContent = `£${total.toFixed(2)}`;
@@ -110,6 +125,39 @@ function renderCart() {
   });
 }
 
+// Handle discount code application
+const discountBtn = document.getElementById('apply-discount-btn');
+const discountInput = document.getElementById('discount-code');
+const discountMessage = document.getElementById('discount-message');
+
+if (discountBtn) {
+  discountBtn.addEventListener('click', () => {
+    const code = discountInput.value.trim().toUpperCase();
+    
+    if (code === DISCOUNT_CODE) {
+      discountApplied = true;
+      discountMessage.textContent = '✓ Discount code applied! (10% off)';
+      discountMessage.style.color = '#10b981';
+      discountBtn.textContent = 'Applied';
+      discountBtn.disabled = true;
+      renderCart();
+    } else if (code === '') {
+      discountMessage.textContent = 'Please enter a code';
+      discountMessage.style.color = '#ef4444';
+    } else {
+      discountMessage.textContent = 'Invalid discount code';
+      discountMessage.style.color = '#ef4444';
+    }
+  });
+  
+  // Allow Enter key to apply discount
+  discountInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      discountBtn.click();
+    }
+  });
+}
+
 // Handle checkout form submission
 const checkoutForm = document.getElementById('checkout-form');
 if (checkoutForm) {
@@ -122,8 +170,16 @@ if (checkoutForm) {
     }
     
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const postage = subtotal < 100 ? 6 : 0;
-    const total = subtotal + postage;
+    
+    // Calculate discount if applied
+    let discountAmount = 0;
+    if (discountApplied) {
+      discountAmount = subtotal * (DISCOUNT_PERCENT / 100);
+    }
+    
+    // Calculate postage (£5 for orders under £100, free over £100)
+    const postage = subtotal < 100 ? 5 : 0;
+    const total = subtotal - discountAmount + postage;
     
     const orderData = {
       orderNumber: 'ORD-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
@@ -136,6 +192,8 @@ if (checkoutForm) {
       orderNotes: document.getElementById('order-notes').value || '',
       items: cart,
       subtotal: subtotal,
+      discountAmount: discountAmount,
+      discountCode: discountApplied ? DISCOUNT_CODE : null,
       postage: postage,
       total: total,
       timestamp: new Date().toISOString()
