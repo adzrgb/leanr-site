@@ -175,11 +175,13 @@ if (checkoutForm) {
         localStorage.removeItem('leanr-cart');
         window.location.href = 'index.html';
       } else {
-        alert('There was an issue processing your order. Please try again.');
+        const errData = await response.json().catch(() => ({}));
+        console.error('Order error:', errData);
+        alert('There was an issue processing your order: ' + (errData.error || response.status));
       }
     } catch (error) {
       console.error('Error:', error);
-      alert('Unable to process order. Please check your connection and try again.');
+      alert('Unable to process order: ' + error.message);
     }
   });
 }
