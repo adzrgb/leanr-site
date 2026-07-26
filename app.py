@@ -30,9 +30,10 @@ BUSINESS_EMAIL_PASSWORD = os.getenv("BUSINESS_EMAIL_PASSWORD", "ugxb naur dasv p
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
-# Admin credentials
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH", hashlib.sha256("Qx7m#K2$pL9@vN4b".encode()).hexdigest())
+# Admin credentials (temporarily hardcoded for debugging)
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD_HASH = hashlib.sha256("Qx7m#K2$pL9@vN4b".encode()).hexdigest()
+print(f"DEBUG: ADMIN_USERNAME={ADMIN_USERNAME}, ADMIN_PASSWORD_HASH={ADMIN_PASSWORD_HASH}")
 ADMIN_TOKENS = {}  # Store active tokens
 
 # File paths for data storage
