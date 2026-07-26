@@ -139,5 +139,49 @@
     </footer>
 
     <script src="cart-script.js?v=2"></script>
+    <script>
+      // Inline discount code handler - guaranteed to run
+      function setupInlineDiscount() {
+        const btn = document.getElementById('apply-discount-btn');
+        const input = document.getElementById('discount-code');
+        const msg = document.getElementById('discount-message');
+        
+        if (!btn) {
+          console.warn('Discount button not found');
+          return;
+        }
+        
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          const code = input.value.trim().toUpperCase();
+          
+          if (code === 'LEANR10') {
+            discountApplied = true;
+            msg.textContent = '✓ Discount code applied! (10% off)';
+            msg.style.color = '#10b981';
+            btn.textContent = 'Applied';
+            btn.disabled = true;
+            renderCart();
+          } else if (code === '') {
+            msg.textContent = 'Please enter a code';
+            msg.style.color = '#ef4444';
+          } else {
+            msg.textContent = 'Invalid discount code';
+            msg.style.color = '#ef4444';
+          }
+        });
+        
+        input.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') btn.click();
+        });
+      }
+      
+      // Run when DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupInlineDiscount);
+      } else {
+        setTimeout(setupInlineDiscount, 50);
+      }
+    </script>
   </body>
 </html>
