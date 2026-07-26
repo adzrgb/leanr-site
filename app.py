@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from resend import Resend
+import requests
 from datetime import datetime
 import json
 import os
@@ -281,7 +281,7 @@ def send_order_emails(data, items_html):
         print(traceback.format_exc())
 
 def send_email(recipient, subject, html_body):
-    """Send email via Resend API"""
+    """Send email via Resend API using requests library"""
     try:
         print(f"\n  → Sending email to {recipient}...")
         print(f"    Subject: {subject}")
@@ -293,18 +293,31 @@ def send_email(recipient, subject, html_body):
             print(f"    → Add RESEND_API_KEY to Render environment variables to enable email delivery")
             return  # Gracefully continue without sending
         
-        client = Resend(api_key=RESEND_API_KEY)
-        
         print(f"    Sending via Resend API...")
-        response = client.emails.send({
-            "from": f"LEANr Wellness <{BUSINESS_EMAIL}>",
-            "to": recipient,
-            "subject": subject,
-            "html": html_body,
-        })
         
-        print(f"    ✓ Email sent successfully to {recipient}")
-        print(f"    Response ID: {response.get('id', 'N/A')}\n")
+        # Make direct HTTP call to Resend API
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": f"LEANr Wellness <{BUSINESS_EMAIL}>",
+                "to": recipient,
+                "subject": subject,
+                "html": html_body,
+            },
+            timeout=10
+        )
+        
+        if response.status_code in [200, 201]:
+            response_data = response.json()
+            print(f"    ✓ Email sent successfully to {recipient}")
+            print(f"    Response ID: {response_data.get('id', 'N/A')}\n")
+        else:
+            print(f"    ✗ Email failed with status {response.status_code}")
+            print(f"    Response: {response.text}\n")
         
     except Exception as e:
         import traceback
