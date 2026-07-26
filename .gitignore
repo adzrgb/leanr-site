@@ -26,4 +26,6 @@ wheels/
 *.txt
 !requirements.txt
 !stock.json
+!orders.json
+!newsletter_emails.json
 .env
