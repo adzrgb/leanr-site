@@ -1,8 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, Email, Content, To
 from datetime import datetime
 import json
 import os
@@ -27,15 +26,16 @@ CORS(app, resources={
 
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
-BUSINESS_EMAIL_PASSWORD = os.getenv("BUSINESS_EMAIL_PASSWORD", "ugxbnaurdazvpkeg").replace(" ", "")  # Remove spaces from app-specific password
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
-# Admin credentials (temporarily hardcoded for debugging)
+print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}")
+print(f"DEBUG: SendGrid API Key present: {'Yes' if SENDGRID_API_KEY else 'No - will use API key from environment'}")
+
+# Admin credentials
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD_HASH = hashlib.sha256("Qx7m#K2$pL9@vN4b".encode()).hexdigest()
-print(f"DEBUG: ADMIN_USERNAME={ADMIN_USERNAME}, ADMIN_PASSWORD_HASH={ADMIN_PASSWORD_HASH}")
-print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}, Password length: {len(BUSINESS_EMAIL_PASSWORD)}")
 ADMIN_TOKENS = {}  # Store active tokens
 
 # File paths for data storage
@@ -282,32 +282,29 @@ def send_order_emails(data, items_html):
         print(traceback.format_exc())
 
 def send_email(recipient, subject, html_body):
+    """Send email via SendGrid API"""
     try:
         print(f"\n  → Sending email to {recipient}...")
         print(f"    Subject: {subject}")
         
-        # Create message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = f"LEANr Wellness <{BUSINESS_EMAIL}>"
-        msg['To'] = recipient
-        msg['Reply-To'] = BUSINESS_EMAIL
+        if not SENDGRID_API_KEY:
+            raise Exception("SENDGRID_API_KEY environment variable not set")
         
-        # Attach HTML
-        part = MIMEText(html_body, 'html')
-        msg.attach(part)
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
         
-        # Send via SMTP
-        print(f"    Connecting to {SMTP_SERVER}:{SMTP_PORT}...")
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
-            print(f"    Starting TLS...")
-            server.starttls()
-            print(f"    Logging in as {BUSINESS_EMAIL}...")
-            server.login(BUSINESS_EMAIL, BUSINESS_EMAIL_PASSWORD)
-            print(f"    Sending mail...")
-            server.sendmail(BUSINESS_EMAIL, recipient, msg.as_string())
+        message = Mail(
+            from_email=Email(BUSINESS_EMAIL, "LEANr Wellness"),
+            to_emails=To(recipient),
+            subject=subject,
+            html_content=html_body
+        )
         
-        print(f"    ✓ Email sent successfully to {recipient}\n")
+        print(f"    Sending via SendGrid API...")
+        response = sg.send(message)
+        
+        print(f"    ✓ Email sent successfully to {recipient}")
+        print(f"    Response status: {response.status_code}\n")
+        
     except Exception as e:
         import traceback
         print(f"    ✗ FAILED to send email to {recipient}")
