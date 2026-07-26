@@ -221,8 +221,17 @@ def send_order():
                             <strong>Goods and Services:</strong> Includes buyer protection. <u>If you choose this option, you MUST add the PayPal fee to your payment or your order will be refunded.</u> The fee is typically 3.49% + £0.20 for UK transactions.
                         </p>
                         
-                        <p><strong>Option 2: Bank Transfer</strong><br>
-                        Please use your order number <strong>{data['orderNumber']}</strong> as the reference when making payment.</p>
+                        <p><strong>Option 2: Bank Transfer</strong></p>
+                        <p style="background: #f0f9ff; padding: 12px; border-radius: 4px; margin: 10px 0;">
+                            <strong>Account Name:</strong> A W<br>
+                            <strong>Sort Code:</strong> 23-01-20<br>
+                            <strong>Account Number:</strong> 13050648<br>
+                            <strong>Reference:</strong> {data['orderNumber'][-4:]} (last 4 digits of order number)
+                        </p>
+                        
+                        <p style="font-size: 13px; color: #666; margin: 10px 0;">
+                            <strong>⚠️ Important:</strong> You may receive a warning that the account name "A W" doesn't match your details. This is normal and expected - please proceed with the payment as normal. The transfer will go through without issue.
+                        </p>
                         
                         <p style="color: #ec4899; font-weight: bold;">⚠️ If paying by PayPal Goods and Services, the fee must be included in your payment or your order will be automatically refunded.</p>
                         
