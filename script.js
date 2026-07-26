@@ -167,7 +167,6 @@ function updateProductBadges(stockData) {
           const warning = document.createElement('span');
           warning.className = 'stock-warning';
           warning.textContent = `Only ${lowestStock} left!`;
-          card.style.position = 'relative';
           card.appendChild(warning);
         }
       }
