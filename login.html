@@ -146,19 +146,13 @@
       successMsg.style.display = 'none';
       
       try {
-        const response = await fetch('http://127.0.0.1:5000/api/admin/login', {
+        const apiUrl = `${window.location.origin}/api/admin/login`;
+        const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'omit',
+          credentials: 'include',
           body: JSON.stringify({ username, password })
-        }).catch(() => 
-          fetch('http://localhost:5000/api/admin/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'omit',
-            body: JSON.stringify({ username, password })
-          })
-        );
+        });
         
         const data = await response.json();
         
