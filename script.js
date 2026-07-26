@@ -161,7 +161,7 @@ function updateProductBadges(stockData) {
         if (lowestStock > 0 && lowestStock <= 5) {
           const warning = document.createElement('span');
           warning.className = 'stock-warning';
-          warning.textContent = `Only ${lowestStock} left!`;
+          warning.textContent = `${lowestStock} left`;
           card.appendChild(warning);
         }
         
@@ -183,6 +183,13 @@ function updateProductBadges(stockData) {
             } else if (productName === 'GHK-CU') {
               updateVariantStockInfo('GHK-CU', 'ghk-stock-info', variantName);
             }
+          }
+        } else if (!Array.isArray(productItem.variants)) {
+          // Non-variant products: update stock info display
+          if (productName === 'KLOW PEN') {
+            updateNonVariantStockInfo('KLOW PEN', 'klow-stock-info');
+          } else if (productName === 'CAGRI') {
+            updateNonVariantStockInfo('CAGRI', 'cagri-stock-info');
           }
         }
       }
@@ -253,6 +260,31 @@ function updateVariantStockInfo(productName, infoElementId, selectedVariantName)
     } else {
       infoEl.textContent = `${selectedVariantName}: Out of stock`;
     }
+  }
+}
+
+// Update stock info display for non-variant products
+function updateNonVariantStockInfo(productName, infoElementId) {
+  const infoEl = document.getElementById(infoElementId);
+  if (!infoEl || !globalStockData || !Array.isArray(globalStockData)) {
+    return;
+  }
+  
+  // Find the product in globalStockData
+  const productData = globalStockData.find(item => item.name === productName);
+  if (!productData || Array.isArray(productData.variants) || !productData.stock) {
+    return;
+  }
+  
+  // Display stock count for non-variant products
+  if (productData.stock > 0) {
+    if (productData.stock <= 5) {
+      infoEl.textContent = `${productData.stock} left`;
+    } else {
+      infoEl.textContent = `${productData.stock} in stock`;
+    }
+  } else {
+    infoEl.textContent = 'Out of stock';
   }
 }
 
