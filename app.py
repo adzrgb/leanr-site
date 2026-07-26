@@ -26,8 +26,8 @@ CORS(app, resources={
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-# Resend sender email (use onboarding@resend.dev as fallback for testing)
-RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+# Resend sender email - use verified business email so both customer AND business emails can be sent
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", BUSINESS_EMAIL)
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
