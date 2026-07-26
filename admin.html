@@ -239,6 +239,55 @@
       color: #64748b;
       padding: 2rem;
     }
+    
+    .payment-section {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 1rem;
+      padding: 1rem;
+      background: white;
+      border-radius: 6px;
+    }
+    
+    .payment-checkbox {
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+    }
+    
+    .payment-status {
+      flex: 1;
+      font-weight: 600;
+    }
+    
+    .payment-status.pending {
+      color: #d97706;
+    }
+    
+    .payment-status.confirmed {
+      color: #10b981;
+    }
+    
+    .confirm-payment-btn {
+      background: #10b981;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    
+    .confirm-payment-btn:hover {
+      background: #059669;
+    }
+    
+    .confirm-payment-btn:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -330,13 +379,9 @@
       const token = localStorage.getItem('admin_token');
       
       try {
-        const response = await fetch('http://127.0.0.1:5000/api/admin/orders', {
+        const response = await fetch(window.location.origin + '/api/admin/orders', {
           headers: { 'Authorization': `Bearer ${token}` }
-        }).catch(() => 
-          fetch('http://localhost:5000/api/admin/orders', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-        );
+        });
         
         if (!response.ok) {
           if (response.status === 401) {
@@ -369,12 +414,21 @@
               ${order.items.map(item => `
                 ${item.name} (${item.option}) x${item.quantity} - £${(item.price * item.quantity).toFixed(2)}
               `).join('<br>')}
-              <div style="margin-top: 0.5rem; font-weight: 600;">Total: £${order.subtotal.toFixed(2)}</div>
+              <div style="margin-top: 0.5rem; font-weight: 600;">Total: £${order.total.toFixed(2)}</div>
             </div>
             <div class="tracking-section">
               <input type="text" class="tracking-input" placeholder="Enter tracking number..." value="${order.trackingNumber || ''}">
               <button class="send-tracking-btn" onclick="sendTracking('${order.orderNumber}', this)">
                 ${order.trackingNumber ? 'Resend' : 'Send'} Tracking
+              </button>
+            </div>
+            <div class="payment-section">
+              <input type="checkbox" class="payment-checkbox" id="payment-${order.orderNumber}" ${order.paymentConfirmed ? 'checked disabled' : ''}>
+              <span class="payment-status ${order.paymentConfirmed ? 'confirmed' : 'pending'}">
+                ${order.paymentConfirmed ? '✓ Payment Confirmed' : '⚠ Payment Pending'}
+              </span>
+              <button class="confirm-payment-btn" onclick="confirmPayment('${order.orderNumber}', this)" ${order.paymentConfirmed ? 'disabled' : ''}>
+                Confirm Payment
               </button>
             </div>
           </div>
@@ -398,25 +452,14 @@
       button.textContent = 'Sending...';
       
       try {
-        const response = await fetch('http://127.0.0.1:5000/api/admin/send-tracking', {
+        const response = await fetch(window.location.origin + '/api/admin/send-tracking', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          credentials: 'omit',
           body: JSON.stringify({ orderNumber, trackingNumber })
-        }).catch(() =>
-          fetch('http://localhost:5000/api/admin/send-tracking', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            credentials: 'omit',
-            body: JSON.stringify({ orderNumber, trackingNumber })
-          })
-        );
+        });
         
         const data = await response.json();
         
@@ -438,13 +481,9 @@
     
     async function loadStockLevels() {
       try {
-        const response = await fetch('http://127.0.0.1:5000/api/admin/stock', {
+        const response = await fetch(window.location.origin + '/api/admin/stock', {
           headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token')}` }
-        }).catch(() =>
-          fetch('http://localhost:5000/api/admin/stock', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token')}` }
-          })
-        );
+        });
         
         if (!response.ok) throw new Error('Failed to load stock');
         
@@ -476,25 +515,14 @@
       const token = localStorage.getItem('admin_token');
       
       try {
-        const response = await fetch('http://127.0.0.1:5000/api/admin/update-stock', {
+        const response = await fetch(window.location.origin + '/api/admin/update-stock', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          credentials: 'omit',
           body: JSON.stringify({ productName, variant, stock: parseInt(newStock) })
-        }).catch(() =>
-          fetch('http://localhost:5000/api/admin/update-stock', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            credentials: 'omit',
-            body: JSON.stringify({ productName, variant, stock: parseInt(newStock) })
-          })
-        );
+        });
         
         if (response.ok) {
           const msg = document.getElementById('stock-message');
@@ -507,17 +535,57 @@
       }
     }
     
+    async function confirmPayment(orderNumber, button) {
+      const checkbox = document.getElementById(`payment-${orderNumber}`);
+      
+      if (!checkbox.checked) {
+        alert('Please check the checkbox first');
+        return;
+      }
+      
+      const token = localStorage.getItem('admin_token');
+      button.disabled = true;
+      button.textContent = 'Confirming...';
+      
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/confirm-payment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ orderNumber })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          const msg = document.getElementById('orders-message');
+          msg.className = 'message success';
+          msg.textContent = 'Payment confirmed! Email sent to customer.';
+          setTimeout(() => msg.className = 'message', 4000);
+          
+          // Refresh orders list
+          setTimeout(() => loadOrders(), 1000);
+        } else {
+          alert(data.error || 'Failed to confirm payment');
+          button.disabled = false;
+          button.textContent = 'Confirm Payment';
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+        button.disabled = false;
+        button.textContent = 'Confirm Payment';
+      }
+    }
+    
     async function loadRevenue() {
       const token = localStorage.getItem('admin_token');
       
       try {
-        const response = await fetch('http://127.0.0.1:5000/api/admin/stats', {
+        const response = await fetch(window.location.origin + '/api/admin/stats', {
           headers: { 'Authorization': `Bearer ${token}` }
-        }).catch(() => 
-          fetch('http://localhost:5000/api/admin/stats', {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-        );
+        });
         
         if (!response.ok) {
           if (response.status === 401) {

@@ -507,6 +507,151 @@ def send_tracking():
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/admin/confirm-payment', methods=['POST', 'OPTIONS'])
+def confirm_payment():
+    """Confirm payment and send confirmation email to customer"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    try:
+        # Verify token
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        token = auth_header.replace('Bearer ', '')
+        if not verify_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
+        data = request.json
+        order_number = data.get('orderNumber')
+        
+        # Find order and update
+        orders = []
+        if os.path.exists(ORDERS_FILE):
+            with open(ORDERS_FILE, 'r') as f:
+                orders = json.load(f)
+        
+        order = next((o for o in orders if o['orderNumber'] == order_number), None)
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+        
+        # Mark payment as confirmed
+        order['paymentConfirmed'] = True
+        with open(ORDERS_FILE, 'w') as f:
+            json.dump(orders, f, indent=2)
+        
+        # Send payment confirmation email to customer
+        payment_confirmation_body = f"""
+        <html>
+            <head>
+                <style>
+                    body {{ font-family: Arial, sans-serif; color: #333; }}
+                    .header {{ background: linear-gradient(135deg, #0052cc, #7c3aed); color: white; padding: 20px; text-align: center; }}
+                    .content {{ padding: 20px; }}
+                    .confirmation-section {{ background: #dcfce7; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981; }}
+                    .confirmation-badge {{ display: inline-block; background: #10b981; color: white; padding: 10px 15px; border-radius: 6px; font-weight: bold; margin: 10px 0; }}
+                    .order-details {{ background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0; }}
+                    .order-details p {{ margin: 8px 0; }}
+                    table {{ width: 100%; border-collapse: collapse; margin: 15px 0; }}
+                    th, td {{ border: 1px solid #e2e8f0; padding: 10px; text-align: left; }}
+                    th {{ background: #f1f5f9; font-weight: bold; }}
+                    .total-row {{ background: #f1f5f9; font-weight: bold; }}
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h1>✓ Payment Confirmed</h1>
+                </div>
+                <div class="content">
+                    <p>Hi {order['customerName']},</p>
+                    <p>Your payment has been confirmed by LEANr. Thank you for your order!</p>
+                    
+                    <div class="confirmation-section">
+                        <div class="confirmation-badge">✓ Payment Confirmed</div>
+                        <h3>Order Number: {order_number}</h3>
+                        <p>We've received your payment and are processing your order.</p>
+                    </div>
+                    
+                    <div class="order-details">
+                        <h4>Order Summary:</h4>
+                        <table>
+                            <tr>
+                                <th>Product</th>
+                                <th>Quantity</th>
+                                <th>Price</th>
+                                <th>Total</th>
+                            </tr>
+        """
+        
+        # Add items to email
+        for item in order.get('items', []):
+            item_total = item['price'] * item['quantity']
+            payment_confirmation_body += f"""
+                            <tr>
+                                <td>{item['name']} ({item['option']})</td>
+                                <td>{item['quantity']}</td>
+                                <td>£{item['price']:.2f}</td>
+                                <td>£{item_total:.2f}</td>
+                            </tr>
+            """
+        
+        # Add totals
+        discount_amount = order.get('discountAmount', 0)
+        postage = order.get('postage', 0)
+        total = order.get('total', order.get('subtotal', 0))
+        
+        payment_confirmation_body += f"""
+                            <tr class="total-row">
+                                <td colspan="3" style="text-align: right;">Subtotal:</td>
+                                <td>£{order.get('subtotal', 0):.2f}</td>
+                            </tr>
+        """
+        
+        if discount_amount > 0:
+            payment_confirmation_body += f"""
+                            <tr class="total-row" style="background: #dcfce7;">
+                                <td colspan="3" style="text-align: right;">Discount ({order.get('discountCode', 'N/A')}):</td>
+                                <td style="color: #10b981;">-£{discount_amount:.2f}</td>
+                            </tr>
+            """
+        
+        payment_confirmation_body += f"""
+                            <tr class="total-row">
+                                <td colspan="3" style="text-align: right;">Postage:</td>
+                                <td>£{postage:.2f}</td>
+                            </tr>
+                            <tr class="total-row" style="font-size: 1.2em;">
+                                <td colspan="3" style="text-align: right;">Total:</td>
+                                <td>£{total:.2f}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <p><strong>What's Next?</strong><br>
+                    Your order will be processed and dispatched shortly. You'll receive a tracking number email once it's on its way.</p>
+                    
+                    <p>Thank you for shopping with LEANr!<br>
+                    The LEANr Team</p>
+                </div>
+            </body>
+        </html>
+        """
+        
+        send_email(
+            order['customerEmail'],
+            f"Payment Confirmed - Order {order_number}",
+            payment_confirmation_body
+        )
+        
+        print(f"✓ Payment confirmation email sent for order {order_number}")
+        return jsonify({'success': True, 'message': 'Payment confirmed and email sent to customer'}), 200
+    except Exception as e:
+        import traceback
+        print(f"ERROR: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/admin/stock', methods=['GET'])
 def get_stock():
     """Get current stock levels"""
