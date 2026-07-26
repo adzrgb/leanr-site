@@ -1,0 +1,48 @@
+{
+  "RETATRUTIDE": [
+    {
+      "name": "20mg",
+      "stock": 2
+    },
+    {
+      "name": "40mg",
+      "stock": 9
+    }
+  ],
+  "TIRZEPETIDE": [
+    {
+      "name": "30mg",
+      "stock": 1
+    },
+    {
+      "name": "60mg",
+      "stock": 1
+    }
+  ],
+  "MT1": [
+    {
+      "name": "Vial",
+      "stock": 1
+    },
+    {
+      "name": "Pen",
+      "stock": 1
+    }
+  ],
+  "GHK-CU": [
+    {
+      "name": "Vial",
+      "stock": 50
+    },
+    {
+      "name": "Pen",
+      "stock": 50
+    }
+  ],
+  "KLOW PEN": {
+    "stock": 50
+  },
+  "CAGRI": {
+    "stock": 50
+  }
+}

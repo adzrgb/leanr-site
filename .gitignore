@@ -25,4 +25,5 @@ wheels/
 *.json
 *.txt
 !requirements.txt
+!stock.json
 .env
