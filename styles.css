@@ -219,30 +219,12 @@ img {
   text-transform: uppercase;
   display: flex;
   align-items: center;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-}
-
-.logo-home {
-  display: flex;
-  align-items: center;
-  text-decoration: none;
   cursor: pointer;
-  transition: transform 0.3s ease, opacity 0.3s ease;
+  transition: transform 0.2s ease;
 }
 
-.logo-home:hover {
+.brand:hover {
   transform: scale(1.05);
-  opacity: 0.8;
-}
-
-.logo-img-right {
-  height: 2rem;
-  width: auto;
 }
 
 .nav-links {
