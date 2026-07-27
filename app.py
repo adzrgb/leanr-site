@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_mail import Mail, Message
 from datetime import datetime
 import json
 import os
@@ -28,12 +29,21 @@ CORS(app, resources={
 
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
-BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
-BREVO_URL = "https://api.brevo.com/v3/smtp/email"
+GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD", "")
+
+# Flask-Mail configuration for Gmail SMTP
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = BUSINESS_EMAIL
+app.config['MAIL_PASSWORD'] = GMAIL_PASSWORD
+app.config['MAIL_DEFAULT_SENDER'] = ('LEANr Wellness', BUSINESS_EMAIL)
+
+mail = Mail(app)
 
 print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}", flush=True)
-print(f"DEBUG: Brevo API Key present: {'Yes' if BREVO_API_KEY else 'No - emails will not send'}", flush=True)
-print(f"DEBUG: Using Brevo HTTP API for email delivery", flush=True)
+print(f"DEBUG: Gmail password present: {'Yes' if GMAIL_PASSWORD else 'No - emails will not send'}", flush=True)
+print(f"DEBUG: Using Gmail SMTP for email delivery", flush=True)
 
 # Admin credentials
 ADMIN_USERNAME = "admin"
@@ -337,57 +347,37 @@ def queue_email(recipient, subject, html_body, order_id=""):
     sys.stdout.flush()
 
 def send_email(recipient, subject, html_body, order_id=""):
-    """Send email via Brevo API (HTTP-based, works on Render free tier)"""
+    """Send email via Gmail SMTP"""
     try:
         print(f"\n  → Sending email to {recipient}...", flush=True)
         print(f"    Subject: {subject}", flush=True)
         
-        if not BREVO_API_KEY:
-            print(f"    ⚠ WARNING: BREVO_API_KEY not configured", flush=True)
+        if not GMAIL_PASSWORD:
+            print(f"    ⚠ WARNING: GMAIL_PASSWORD not configured", flush=True)
             queue_email(recipient, subject, html_body, order_id)
             return
         
-        print(f"    Sending via Brevo API...", flush=True)
+        print(f"    Sending via Gmail SMTP...", flush=True)
         print(f"    From: {BUSINESS_EMAIL}", flush=True)
         print(f"    To: {recipient}", flush=True)
         sys.stdout.flush()
         
-        # Build Brevo email payload
-        payload = {
-            "sender": {
-                "email": BUSINESS_EMAIL,
-                "name": "LEANr Wellness"
-            },
-            "to": [{"email": recipient}],
-            "subject": subject,
-            "htmlContent": html_body
-        }
+        # Create message
+        msg = Message(
+            subject=subject,
+            recipients=[recipient],
+            html=html_body
+        )
         
-        headers = {
-            "api-key": BREVO_API_KEY,
-            "Content-Type": "application/json"
-        }
-        
-        # Send via Brevo API
-        response = requests.post(BREVO_URL, json=payload, headers=headers, timeout=10)
-        
-        if response.status_code in [200, 201, 202]:
-            print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
-            sys.stdout.flush()
-        else:
-            # Queue the email for retry if provider not ready
-            error_msg = response.text
-            if "not yet activated" in error_msg or "blocked" in error_msg.lower():
-                print(f"    ⚠ Provider not ready ({response.status_code})", flush=True)
-                queue_email(recipient, subject, html_body, order_id)
-            else:
-                print(f"    ✗ FAILED with status {response.status_code}: {error_msg}\n", flush=True)
-                sys.stdout.flush()
-                raise Exception(f"Brevo API error: {response.status_code}")
+        # Send email
+        mail.send(msg)
+        print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
+        sys.stdout.flush()
         
     except Exception as e:
         import traceback
         print(f"    ✗ Error: {str(e)}", flush=True)
+        traceback.print_exc()
         queue_email(recipient, subject, html_body, order_id)
         sys.stdout.flush()
 
@@ -417,7 +407,7 @@ def get_email_queue():
         return jsonify({
             'total': len(queue),
             'queued': queue,
-            'provider_status': 'Brevo API (awaiting account activation)'
+            'provider_status': 'Gmail SMTP'
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
