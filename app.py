@@ -1,7 +1,9 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_mail import Mail, Message
 from datetime import datetime
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 import json
 import os
 import secrets
@@ -30,16 +32,6 @@ CORS(app, resources={
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
 GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", os.getenv("GMAIL_PASSWORD", ""))
-
-# Flask-Mail configuration for Gmail SMTP
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = BUSINESS_EMAIL
-app.config['MAIL_PASSWORD'] = GMAIL_PASSWORD
-app.config['MAIL_DEFAULT_SENDER'] = ('LEANr Wellness', BUSINESS_EMAIL)
-
-mail = Mail(app)
 
 print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}", flush=True)
 print(f"DEBUG: Gmail password present: {'Yes' if GMAIL_PASSWORD else 'No - emails will not send'}", flush=True)
@@ -347,7 +339,7 @@ def queue_email(recipient, subject, html_body, order_id=""):
     sys.stdout.flush()
 
 def send_email(recipient, subject, html_body, order_id=""):
-    """Send email via Gmail SMTP"""
+    """Send email via Gmail SMTP using smtplib"""
     try:
         print(f"\n  → Sending email to {recipient}...", flush=True)
         print(f"    Subject: {subject}", flush=True)
@@ -358,20 +350,19 @@ def send_email(recipient, subject, html_body, order_id=""):
             return
         
         print(f"    Sending via Gmail SMTP...", flush=True)
-        print(f"    From: {BUSINESS_EMAIL}", flush=True)
-        print(f"    To: {recipient}", flush=True)
         sys.stdout.flush()
         
-        # Create message
-        msg = Message(
-            subject=subject,
-            recipients=[recipient],
-            html=html_body
-        )
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = f'LEANr Wellness <{BUSINESS_EMAIL}>'
+        msg['To'] = recipient
+        msg.attach(MIMEText(html_body, 'html'))
         
-        # Send email within app context (required for Flask-Mail in background threads)
-        with app.app_context():
-            mail.send(msg)
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(BUSINESS_EMAIL, GMAIL_PASSWORD)
+            server.sendmail(BUSINESS_EMAIL, recipient, msg.as_string())
+        
         print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
         sys.stdout.flush()
         
