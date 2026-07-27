@@ -422,6 +422,22 @@ def get_email_queue():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/email-queue-debug', methods=['GET'])
+def get_email_queue_debug():
+    """DEBUG: Check email queue status (no auth required for testing)"""
+    try:
+        queue = load_email_queue()
+        return jsonify({
+            'status': 'Email Queue Debug',
+            'total_queued': len(queue),
+            'brevo_api_key_set': bool(BREVO_API_KEY),
+            'business_email': BUSINESS_EMAIL,
+            'recent_queued': queue[-5:] if queue else [],  # Last 5 queued
+            'message': 'Emails are queued here waiting for Brevo to activate'
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/admin/email-queue/retry-all', methods=['POST', 'OPTIONS'])
 def retry_all_queued_emails():
     """Retry sending all queued emails"""
