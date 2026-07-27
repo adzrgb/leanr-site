@@ -28,14 +28,14 @@ CORS(app, resources={
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-# Resend sender email - MUST be from verified domain (leanrwellness.com), not gmail.com
-# For verified sending, use domain address. Orders notification goes to BUSINESS_EMAIL
-RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "orders@leanrwellness.com")
+# Resend sender email - MUST be from verified domain (leanrwellness.com)
+# Use domain address for all customer emails
+RESEND_FROM_EMAIL = "orders@leanrwellness.com"
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
 print(f"DEBUG: EMAIL CONFIG - Business email (for notifications): {BUSINESS_EMAIL}")
-print(f"DEBUG: Resend sender email (for customer): {RESEND_FROM_EMAIL}")
+print(f"DEBUG: Resend sender email (from domain): {RESEND_FROM_EMAIL}")
 print(f"DEBUG: Resend API Key present: {'Yes' if RESEND_API_KEY else 'No - will use API key from environment'}")
 
 # Admin credentials
