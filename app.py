@@ -1,9 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from datetime import datetime
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 import json
 import os
 import secrets
@@ -31,11 +28,11 @@ CORS(app, resources={
 
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
-GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", os.getenv("GMAIL_PASSWORD", ""))
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 
 print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}", flush=True)
-print(f"DEBUG: Gmail password present: {'Yes' if GMAIL_PASSWORD else 'No - emails will not send'}", flush=True)
-print(f"DEBUG: Using Gmail SMTP for email delivery", flush=True)
+print(f"DEBUG: Resend API key present: {'Yes' if RESEND_API_KEY else 'No - emails will not send'}", flush=True)
+print(f"DEBUG: Using Resend for email delivery", flush=True)
 
 # Admin credentials
 ADMIN_USERNAME = "admin"
@@ -339,32 +336,40 @@ def queue_email(recipient, subject, html_body, order_id=""):
     sys.stdout.flush()
 
 def send_email(recipient, subject, html_body, order_id=""):
-    """Send email via Gmail SMTP using smtplib"""
+    """Send email via Resend API"""
     try:
         print(f"\n  → Sending email to {recipient}...", flush=True)
         print(f"    Subject: {subject}", flush=True)
         
-        if not GMAIL_PASSWORD:
-            print(f"    ⚠ WARNING: GMAIL_PASSWORD not configured", flush=True)
+        if not RESEND_API_KEY:
+            print(f"    ⚠ WARNING: RESEND_API_KEY not configured", flush=True)
             queue_email(recipient, subject, html_body, order_id)
             return
         
-        print(f"    Sending via Gmail SMTP...", flush=True)
+        print(f"    Sending via Resend API...", flush=True)
         sys.stdout.flush()
         
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = f'LEANr Wellness <{BUSINESS_EMAIL}>'
-        msg['To'] = recipient
-        msg.attach(MIMEText(html_body, 'html'))
+        headers = {
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json"
+        }
         
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login(BUSINESS_EMAIL, GMAIL_PASSWORD)
-            server.sendmail(BUSINESS_EMAIL, recipient, msg.as_string())
+        payload = {
+            "from": f"LEANr Wellness <{BUSINESS_EMAIL}>",
+            "to": recipient,
+            "subject": subject,
+            "html": html_body
+        }
         
-        print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
-        sys.stdout.flush()
+        response = requests.post("https://api.resend.com/emails", json=payload, headers=headers, timeout=10)
+        
+        if response.status_code in [200, 201]:
+            print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
+            sys.stdout.flush()
+        else:
+            print(f"    ✗ Resend API error: {response.status_code} - {response.text}", flush=True)
+            queue_email(recipient, subject, html_body, order_id)
+            sys.stdout.flush()
         
     except Exception as e:
         import traceback
