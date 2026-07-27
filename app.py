@@ -10,9 +10,7 @@ import random
 from dotenv import load_dotenv
 import threading
 import sys
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
 
 load_dotenv()
 
@@ -30,13 +28,12 @@ CORS(app, resources={
 
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
-GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
-SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 
-print(f"DEBUG: EMAIL CONFIG - Business email (for notifications): {BUSINESS_EMAIL}")
-print(f"DEBUG: Gmail App Password present: {'Yes' if GMAIL_APP_PASSWORD else 'No - emails will not send'}")
-print(f"DEBUG: Using Gmail SMTP for email delivery")
+print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}", flush=True)
+print(f"DEBUG: Brevo API Key present: {'Yes' if BREVO_API_KEY else 'No - emails will not send'}", flush=True)
+print(f"DEBUG: Using Brevo HTTP API for email delivery", flush=True)
 
 # Admin credentials
 ADMIN_USERNAME = "admin"
@@ -308,43 +305,50 @@ def send_order_emails(data, items_html):
         sys.stdout.flush()
 
 def send_email(recipient, subject, html_body):
-    """Send email via Gmail SMTP"""
+    """Send email via Brevo API (HTTP-based, works on Render free tier)"""
     try:
         print(f"\n  → Sending email to {recipient}...", flush=True)
         print(f"    Subject: {subject}", flush=True)
         
-        if not GMAIL_APP_PASSWORD:
-            print(f"    ⚠ WARNING: GMAIL_APP_PASSWORD not configured", flush=True)
-            print(f"    → Email QUEUED but not sent (Gmail app password missing)", flush=True)
+        if not BREVO_API_KEY:
+            print(f"    ⚠ WARNING: BREVO_API_KEY not configured", flush=True)
+            print(f"    → Email QUEUED but not sent (Brevo API key missing)", flush=True)
             print(f"    → To: {recipient}", flush=True)
-            print(f"    → Add GMAIL_APP_PASSWORD to Render environment variables to enable email delivery", flush=True)
-            print(f"    → Instructions: Create app password at https://myaccount.google.com/apppasswords", flush=True)
+            print(f"    → Add BREVO_API_KEY to Render environment variables", flush=True)
             sys.stdout.flush()
             return  # Gracefully continue without sending
         
-        print(f"    Sending via Gmail SMTP...", flush=True)
+        print(f"    Sending via Brevo API...", flush=True)
         print(f"    From: {BUSINESS_EMAIL}", flush=True)
         print(f"    To: {recipient}", flush=True)
         sys.stdout.flush()
         
-        # Create email message
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = BUSINESS_EMAIL
-        msg['To'] = recipient
+        # Build Brevo email payload
+        payload = {
+            "sender": {
+                "email": BUSINESS_EMAIL,
+                "name": "LEANr Wellness"
+            },
+            "to": [{"email": recipient}],
+            "subject": subject,
+            "htmlContent": html_body
+        }
         
-        # Attach HTML body
-        html_part = MIMEText(html_body, 'html')
-        msg.attach(html_part)
+        headers = {
+            "api-key": BREVO_API_KEY,
+            "Content-Type": "application/json"
+        }
         
-        # Connect to Gmail SMTP and send
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()  # Secure the connection
-            server.login(BUSINESS_EMAIL, GMAIL_APP_PASSWORD)
-            server.send_message(msg)
-            
+        # Send via Brevo API
+        response = requests.post(BREVO_URL, json=payload, headers=headers, timeout=10)
+        
+        if response.status_code in [200, 201, 202]:
             print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
             sys.stdout.flush()
+        else:
+            print(f"    ✗ FAILED with status {response.status_code}: {response.text}\n", flush=True)
+            sys.stdout.flush()
+            raise Exception(f"Brevo API error: {response.status_code} - {response.text}")
         
     except Exception as e:
         import traceback
