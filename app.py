@@ -309,6 +309,8 @@ def send_email(recipient, subject, html_body):
             return  # Gracefully continue without sending
         
         print(f"    Sending via Resend API...")
+        print(f"    From: {RESEND_FROM_EMAIL}")
+        print(f"    To: {recipient}")
         
         # Make direct HTTP call to Resend API
         response = requests.post(
@@ -327,14 +329,21 @@ def send_email(recipient, subject, html_body):
             timeout=10
         )
         
+        print(f"    Resend API Response Status: {response.status_code}")
+        
         if response.status_code in [200, 201]:
             response_data = response.json()
             print(f"    ✓ Email sent successfully to {recipient}")
             print(f"    Response ID: {response_data.get('id', 'N/A')}\n")
         else:
-            print(f"    ✗ Email failed with status {response.status_code}")
-            print(f"    Response: {response.text}\n")
-            raise Exception(f"Email API returned {response.status_code}: {response.text}")
+            print(f"    ✗ Email API Error Status {response.status_code}")
+            print(f"    Full Response: {response.text}\n")
+            try:
+                error_data = response.json()
+                print(f"    Error details: {error_data}\n")
+            except:
+                pass
+            raise Exception(f"Resend API Error {response.status_code}: {response.text}")
         
     except Exception as e:
         import traceback
