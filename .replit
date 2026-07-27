@@ -1,0 +1,35 @@
+modules = ["python-3.11"]
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["gunicorn", "--bind", "0.0.0.0:8080", "--timeout", "120", "app:app"]
+deploymentTarget = "autoscale"
+
+[workflows]
+runButton = "Run Flask App"
+
+[[workflows.workflow]]
+name = "Run Flask App"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start Flask"
+
+[[workflows.workflow]]
+name = "Start Flask"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "gunicorn --bind 0.0.0.0:8080 --timeout 120 --workers 1 app:app"
+waitForPort = 8080
