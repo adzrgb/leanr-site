@@ -29,7 +29,7 @@ CORS(app, resources={
 
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
-GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD", "")
+GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", os.getenv("GMAIL_PASSWORD", ""))
 
 # Flask-Mail configuration for Gmail SMTP
 app.config['MAIL_SERVER'] = 'smtp.gmail.com'
