@@ -275,7 +275,7 @@ def send_order_emails(data, items_html):
         print(f"[1/2] Attempting to send BUSINESS email...", flush=True)
         sys.stdout.flush()
         try:
-            send_email(BUSINESS_EMAIL, f"New Order: {data['orderNumber']}", business_email_body)
+            send_email(BUSINESS_EMAIL, f"New Order: {data['orderNumber']}", business_email_body, data['orderNumber'])
             print(f"✓ Business email sent successfully", flush=True)
             sys.stdout.flush()
         except Exception as e:
@@ -287,7 +287,7 @@ def send_order_emails(data, items_html):
         print(f"[2/2] Attempting to send CUSTOMER email...", flush=True)
         sys.stdout.flush()
         try:
-            send_email(data['customerEmail'], f"Order Confirmation: {data['orderNumber']}", customer_email_body)
+            send_email(data['customerEmail'], f"Order Confirmation: {data['orderNumber']}", customer_email_body, data['orderNumber'])
             print(f"✓ Customer email sent successfully", flush=True)
             sys.stdout.flush()
         except Exception as e:
@@ -304,7 +304,39 @@ def send_order_emails(data, items_html):
         print(traceback.format_exc(), flush=True)
         sys.stdout.flush()
 
-def send_email(recipient, subject, html_body):
+EMAIL_QUEUE_FILE = "email_queue.json"
+
+def load_email_queue():
+    """Load email queue from file"""
+    if os.path.exists(EMAIL_QUEUE_FILE):
+        try:
+            with open(EMAIL_QUEUE_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_email_queue(queue):
+    """Save email queue to file"""
+    with open(EMAIL_QUEUE_FILE, 'w') as f:
+        json.dump(queue, f, indent=2)
+
+def queue_email(recipient, subject, html_body, order_id=""):
+    """Add email to queue for later sending"""
+    queue = load_email_queue()
+    queue.append({
+        "recipient": recipient,
+        "subject": subject,
+        "htmlContent": html_body,
+        "order_id": order_id,
+        "queued_at": datetime.now().isoformat(),
+        "status": "pending"
+    })
+    save_email_queue(queue)
+    print(f"    ⏳ Email QUEUED (awaiting provider activation): {recipient}", flush=True)
+    sys.stdout.flush()
+
+def send_email(recipient, subject, html_body, order_id=""):
     """Send email via Brevo API (HTTP-based, works on Render free tier)"""
     try:
         print(f"\n  → Sending email to {recipient}...", flush=True)
@@ -312,11 +344,8 @@ def send_email(recipient, subject, html_body):
         
         if not BREVO_API_KEY:
             print(f"    ⚠ WARNING: BREVO_API_KEY not configured", flush=True)
-            print(f"    → Email QUEUED but not sent (Brevo API key missing)", flush=True)
-            print(f"    → To: {recipient}", flush=True)
-            print(f"    → Add BREVO_API_KEY to Render environment variables", flush=True)
-            sys.stdout.flush()
-            return  # Gracefully continue without sending
+            queue_email(recipient, subject, html_body, order_id)
+            return
         
         print(f"    Sending via Brevo API...", flush=True)
         print(f"    From: {BUSINESS_EMAIL}", flush=True)
@@ -346,24 +375,123 @@ def send_email(recipient, subject, html_body):
             print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
             sys.stdout.flush()
         else:
-            print(f"    ✗ FAILED with status {response.status_code}: {response.text}\n", flush=True)
-            sys.stdout.flush()
-            raise Exception(f"Brevo API error: {response.status_code} - {response.text}")
+            # Queue the email for retry if provider not ready
+            error_msg = response.text
+            if "not yet activated" in error_msg or "blocked" in error_msg.lower():
+                print(f"    ⚠ Provider not ready ({response.status_code})", flush=True)
+                queue_email(recipient, subject, html_body, order_id)
+            else:
+                print(f"    ✗ FAILED with status {response.status_code}: {error_msg}\n", flush=True)
+                sys.stdout.flush()
+                raise Exception(f"Brevo API error: {response.status_code}")
         
     except Exception as e:
         import traceback
-        print(f"    ✗ FAILED to send email to {recipient}", flush=True)
-        print(f"    Error: {str(e)}", flush=True)
-        print(f"    Traceback:", flush=True)
-        print(traceback.format_exc(), flush=True)
+        print(f"    ✗ Error: {str(e)}", flush=True)
+        queue_email(recipient, subject, html_body, order_id)
         sys.stdout.flush()
-        raise
 
 # ==================== ADMIN ENDPOINTS ====================
 
 def verify_token(token):
     """Verify admin token"""
     return token in ADMIN_TOKENS
+
+@app.route('/api/admin/email-queue', methods=['GET', 'OPTIONS'])
+def get_email_queue():
+    """Get list of queued emails"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    try:
+        # Verify token
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        token = auth_header.replace('Bearer ', '')
+        if not verify_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
+        queue = load_email_queue()
+        return jsonify({
+            'total': len(queue),
+            'queued': queue,
+            'provider_status': 'Brevo API (awaiting account activation)'
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/email-queue/retry-all', methods=['POST', 'OPTIONS'])
+def retry_all_queued_emails():
+    """Retry sending all queued emails"""
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    try:
+        # Verify token
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Unauthorized'}), 401
+        
+        token = auth_header.replace('Bearer ', '')
+        if not verify_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+        
+        queue = load_email_queue()
+        sent = 0
+        failed = 0
+        still_queued = []
+        
+        for email in queue:
+            try:
+                # Try to send
+                response = None
+                if BREVO_API_KEY:
+                    payload = {
+                        "sender": {
+                            "email": BUSINESS_EMAIL,
+                            "name": "LEANr Wellness"
+                        },
+                        "to": [{"email": email['recipient']}],
+                        "subject": email['subject'],
+                        "htmlContent": email['htmlContent']
+                    }
+                    
+                    headers = {
+                        "api-key": BREVO_API_KEY,
+                        "Content-Type": "application/json"
+                    }
+                    
+                    response = requests.post(BREVO_URL, json=payload, headers=headers, timeout=10)
+                    
+                    if response.status_code in [200, 201, 202]:
+                        sent += 1
+                        print(f"✓ Queued email SENT to {email['recipient']}", flush=True)
+                    else:
+                        # Still not ready, keep in queue
+                        still_queued.append(email)
+                        failed += 1
+                        print(f"⚠ Email still queued for {email['recipient']}", flush=True)
+                else:
+                    still_queued.append(email)
+                    failed += 1
+            except Exception as e:
+                still_queued.append(email)
+                failed += 1
+                print(f"✗ Failed to retry email to {email['recipient']}: {str(e)}", flush=True)
+        
+        # Save remaining queued emails
+        save_email_queue(still_queued)
+        
+        return jsonify({
+            'message': f'Retry complete: {sent} sent, {failed} still queued',
+            'sent': sent,
+            'failed': failed,
+            'remaining': still_queued
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/login.html')
 def serve_login():
@@ -524,7 +652,8 @@ def send_tracking():
         send_email(
             order['customerEmail'],
             f"Your Order {order_number} is on the Way! - Tracking: {tracking_number}",
-            tracking_email_body
+            tracking_email_body,
+            order_number
         )
         
         print(f"✓ Tracking email sent for order {order_number}")
@@ -669,7 +798,8 @@ def confirm_payment():
         send_email(
             order['customerEmail'],
             f"Payment Confirmed - Order {order_number}",
-            payment_confirmation_body
+            payment_confirmation_body,
+            order_number
         )
         
         print(f"✓ Payment confirmation email sent for order {order_number}")
