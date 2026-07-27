@@ -10,6 +10,7 @@ import time
 import random
 from dotenv import load_dotenv
 import threading
+import sys
 
 load_dotenv()
 
@@ -149,9 +150,11 @@ def send_order():
             try:
                 send_order_emails(data, items_html)
             except Exception as e:
-                print(f"✗ Background email error: {str(e)}")
+                print(f"✗ Background email error: {str(e)}", flush=True)
+                sys.stdout.flush()
         
-        email_thread = threading.Thread(target=send_emails_background, daemon=True)
+        # Use daemon=False so Render waits for thread completion before terminating
+        email_thread = threading.Thread(target=send_emails_background, daemon=False)
         email_thread.start()
         
         return result, 200
@@ -165,11 +168,12 @@ def send_order():
 def send_order_emails(data, items_html):
     """Send order confirmation emails"""
     try:
-        print(f"\n{'='*60}")
-        print(f"STARTING EMAIL SEND FOR ORDER: {data['orderNumber']}")
-        print(f"Customer: {data['customerEmail']}")
-        print(f"Business email: {BUSINESS_EMAIL}")
-        print(f"{'='*60}\n")
+        print(f"\n{'='*60}", flush=True)
+        print(f"STARTING EMAIL SEND FOR ORDER: {data['orderNumber']}", flush=True)
+        print(f"Customer: {data['customerEmail']}", flush=True)
+        print(f"Business email: {BUSINESS_EMAIL}", flush=True)
+        print(f"{'='*60}\n", flush=True)
+        sys.stdout.flush()
         
         # Business email body
         business_email_body = f"""
@@ -272,45 +276,56 @@ def send_order_emails(data, items_html):
         """
         
         # Send business email
-        print(f"[1/2] Attempting to send BUSINESS email...")
+        print(f"[1/2] Attempting to send BUSINESS email...", flush=True)
+        sys.stdout.flush()
         try:
             send_email(BUSINESS_EMAIL, f"New Order: {data['orderNumber']}", business_email_body)
-            print(f"✓ Business email sent successfully")
+            print(f"✓ Business email sent successfully", flush=True)
+            sys.stdout.flush()
         except Exception as e:
-            print(f"✗ Business email FAILED: {str(e)}")
+            print(f"✗ Business email FAILED: {str(e)}", flush=True)
+            sys.stdout.flush()
             raise
         
         # Send customer email
-        print(f"[2/2] Attempting to send CUSTOMER email...")
+        print(f"[2/2] Attempting to send CUSTOMER email...", flush=True)
+        sys.stdout.flush()
         try:
             send_email(data['customerEmail'], f"Order Confirmation: {data['orderNumber']}", customer_email_body)
-            print(f"✓ Customer email sent successfully")
+            print(f"✓ Customer email sent successfully", flush=True)
+            sys.stdout.flush()
         except Exception as e:
-            print(f"✗ Customer email FAILED: {str(e)}")
+            print(f"✗ Customer email FAILED: {str(e)}", flush=True)
+            sys.stdout.flush()
             raise
         
-        print(f"✓ ALL EMAILS SENT SUCCESSFULLY for order {data['orderNumber']}\n")
+        print(f"✓ ALL EMAILS SENT SUCCESSFULLY for order {data['orderNumber']}\n", flush=True)
+        sys.stdout.flush()
     except Exception as e:
-        print(f"✗ Email sending failed: {str(e)}")
+        print(f"✗ Email sending failed: {str(e)}", flush=True)
+        sys.stdout.flush()
         import traceback
-        print(traceback.format_exc())
+        print(traceback.format_exc(), flush=True)
+        sys.stdout.flush()
 
 def send_email(recipient, subject, html_body):
     """Send email via Resend API using requests library"""
     try:
-        print(f"\n  → Sending email to {recipient}...")
-        print(f"    Subject: {subject}")
+        print(f"\n  → Sending email to {recipient}...", flush=True)
+        print(f"    Subject: {subject}", flush=True)
         
         if not RESEND_API_KEY:
-            print(f"    ⚠ WARNING: RESEND_API_KEY not configured yet")
-            print(f"    → Email QUEUED but not sent (API key missing)")
-            print(f"    → To: {recipient}")
-            print(f"    → Add RESEND_API_KEY to Render environment variables to enable email delivery")
+            print(f"    ⚠ WARNING: RESEND_API_KEY not configured yet", flush=True)
+            print(f"    → Email QUEUED but not sent (API key missing)", flush=True)
+            print(f"    → To: {recipient}", flush=True)
+            print(f"    → Add RESEND_API_KEY to Render environment variables to enable email delivery", flush=True)
+            sys.stdout.flush()
             return  # Gracefully continue without sending
         
-        print(f"    Sending via Resend API...")
-        print(f"    From: {RESEND_FROM_EMAIL}")
-        print(f"    To: {recipient}")
+        print(f"    Sending via Resend API...", flush=True)
+        print(f"    From: {RESEND_FROM_EMAIL}", flush=True)
+        print(f"    To: {recipient}", flush=True)
+        sys.stdout.flush()
         
         # Make direct HTTP call to Resend API
         response = requests.post(
@@ -329,28 +344,32 @@ def send_email(recipient, subject, html_body):
             timeout=10
         )
         
-        print(f"    Resend API Response Status: {response.status_code}")
+        print(f"    Resend API Response Status: {response.status_code}", flush=True)
+        sys.stdout.flush()
         
         if response.status_code in [200, 201]:
             response_data = response.json()
-            print(f"    ✓ Email sent successfully to {recipient}")
-            print(f"    Response ID: {response_data.get('id', 'N/A')}\n")
+            print(f"    ✓ Email sent successfully to {recipient}", flush=True)
+            print(f"    Response ID: {response_data.get('id', 'N/A')}\n", flush=True)
+            sys.stdout.flush()
         else:
-            print(f"    ✗ Email API Error Status {response.status_code}")
-            print(f"    Full Response: {response.text}\n")
+            print(f"    ✗ Email API Error Status {response.status_code}", flush=True)
+            print(f"    Full Response: {response.text}\n", flush=True)
+            sys.stdout.flush()
             try:
                 error_data = response.json()
-                print(f"    Error details: {error_data}\n")
+                print(f"    Error details: {error_data}\n", flush=True)
             except:
                 pass
             raise Exception(f"Resend API Error {response.status_code}: {response.text}")
         
     except Exception as e:
         import traceback
-        print(f"    ✗ FAILED to send email to {recipient}")
-        print(f"    Error: {str(e)}")
-        print(f"    Traceback:")
-        print(traceback.format_exc())
+        print(f"    ✗ FAILED to send email to {recipient}", flush=True)
+        print(f"    Error: {str(e)}", flush=True)
+        print(f"    Traceback:", flush=True)
+        print(traceback.format_exc(), flush=True)
+        sys.stdout.flush()
         raise
 
 # ==================== ADMIN ENDPOINTS ====================
