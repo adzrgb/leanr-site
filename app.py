@@ -355,7 +355,8 @@ def send_email(recipient, subject, html_body, order_id=""):
         }
         
         payload = {
-            "from": f"LEANr Wellness <{BUSINESS_EMAIL}>",
+            "from": "LEANr Wellness <orders@leanrwellness.com>",
+            "reply_to": BUSINESS_EMAIL,
             "to": recipient,
             "subject": subject,
             "html": html_body
