@@ -6,6 +6,8 @@ import json
 import os
 import secrets
 import hashlib
+import time
+import random
 from dotenv import load_dotenv
 import threading
 
@@ -82,6 +84,15 @@ def send_order():
         print("=" * 50)
         
         data = request.json
+        
+        # Generate orderNumber if not provided (for API requests without frontend)
+        if 'orderNumber' not in data or not data['orderNumber']:
+            data['orderNumber'] = 'ORD-' + str(int(time.time() * 1000)) + '-' + str(random.randint(10000, 99999))
+        
+        # Generate timestamp if not provided
+        if 'timestamp' not in data or not data['timestamp']:
+            data['timestamp'] = datetime.now().isoformat()
+        
         print(f"Order Number: {data.get('orderNumber')}")
         print(f"Customer: {data.get('customerName')}")
         print(f"Email: {data.get('customerEmail')}")
