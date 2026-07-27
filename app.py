@@ -369,8 +369,9 @@ def send_email(recipient, subject, html_body, order_id=""):
             html=html_body
         )
         
-        # Send email
-        mail.send(msg)
+        # Send email within app context (required for Flask-Mail in background threads)
+        with app.app_context():
+            mail.send(msg)
         print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
         sys.stdout.flush()
         
