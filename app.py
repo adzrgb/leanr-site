@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import requests
 from datetime import datetime
 import json
 import os
@@ -11,6 +10,9 @@ import random
 from dotenv import load_dotenv
 import threading
 import sys
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 load_dotenv()
 
@@ -28,16 +30,13 @@ CORS(app, resources={
 
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
-RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-# Resend sender email - use domain address (leanrwellness.com verified in Resend)
-# This allows sending to both business and customer emails
-RESEND_FROM_EMAIL = "orders@leanrwellness.com"
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
 
 print(f"DEBUG: EMAIL CONFIG - Business email (for notifications): {BUSINESS_EMAIL}")
-print(f"DEBUG: Resend sender email (from domain): {RESEND_FROM_EMAIL}")
-print(f"DEBUG: Resend API Key present: {'Yes' if RESEND_API_KEY else 'No - will use API key from environment'}")
+print(f"DEBUG: Gmail App Password present: {'Yes' if GMAIL_APP_PASSWORD else 'No - emails will not send'}")
+print(f"DEBUG: Using Gmail SMTP for email delivery")
 
 # Admin credentials
 ADMIN_USERNAME = "admin"
@@ -309,59 +308,43 @@ def send_order_emails(data, items_html):
         sys.stdout.flush()
 
 def send_email(recipient, subject, html_body):
-    """Send email via Resend API using requests library"""
+    """Send email via Gmail SMTP"""
     try:
         print(f"\n  → Sending email to {recipient}...", flush=True)
         print(f"    Subject: {subject}", flush=True)
         
-        if not RESEND_API_KEY:
-            print(f"    ⚠ WARNING: RESEND_API_KEY not configured yet", flush=True)
-            print(f"    → Email QUEUED but not sent (API key missing)", flush=True)
+        if not GMAIL_APP_PASSWORD:
+            print(f"    ⚠ WARNING: GMAIL_APP_PASSWORD not configured", flush=True)
+            print(f"    → Email QUEUED but not sent (Gmail app password missing)", flush=True)
             print(f"    → To: {recipient}", flush=True)
-            print(f"    → Add RESEND_API_KEY to Render environment variables to enable email delivery", flush=True)
+            print(f"    → Add GMAIL_APP_PASSWORD to Render environment variables to enable email delivery", flush=True)
+            print(f"    → Instructions: Create app password at https://myaccount.google.com/apppasswords", flush=True)
             sys.stdout.flush()
             return  # Gracefully continue without sending
         
-        print(f"    Sending via Resend API...", flush=True)
-        print(f"    From: {RESEND_FROM_EMAIL}", flush=True)
+        print(f"    Sending via Gmail SMTP...", flush=True)
+        print(f"    From: {BUSINESS_EMAIL}", flush=True)
         print(f"    To: {recipient}", flush=True)
         sys.stdout.flush()
         
-        # Make direct HTTP call to Resend API
-        response = requests.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {RESEND_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "from": RESEND_FROM_EMAIL,
-                "to": recipient,
-                "subject": subject,
-                "html": html_body,
-                "reply_to": BUSINESS_EMAIL,  # Reply-To so customers reply to business email
-            },
-            timeout=10
-        )
+        # Create email message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = BUSINESS_EMAIL
+        msg['To'] = recipient
         
-        print(f"    Resend API Response Status: {response.status_code}", flush=True)
-        sys.stdout.flush()
+        # Attach HTML body
+        html_part = MIMEText(html_body, 'html')
+        msg.attach(html_part)
         
-        if response.status_code in [200, 201]:
-            response_data = response.json()
-            print(f"    ✓ Email sent successfully to {recipient}", flush=True)
-            print(f"    Response ID: {response_data.get('id', 'N/A')}\n", flush=True)
+        # Connect to Gmail SMTP and send
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()  # Secure the connection
+            server.login(BUSINESS_EMAIL, GMAIL_APP_PASSWORD)
+            server.send_message(msg)
+            
+            print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
             sys.stdout.flush()
-        else:
-            print(f"    ✗ Email API Error Status {response.status_code}", flush=True)
-            print(f"    Full Response: {response.text}\n", flush=True)
-            sys.stdout.flush()
-            try:
-                error_data = response.json()
-                print(f"    Error details: {error_data}\n", flush=True)
-            except:
-                pass
-            raise Exception(f"Resend API Error {response.status_code}: {response.text}")
         
     except Exception as e:
         import traceback
