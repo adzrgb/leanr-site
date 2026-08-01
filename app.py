@@ -33,9 +33,9 @@ CORS(app, resources={
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
-BREVO_ENABLED = os.getenv("BREVO_ENABLED", "true").lower() == "true"
+BREVO_ENABLED = os.getenv("BREVO_ENABLED", "false").lower() == "true"
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
-RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "LEANr Wellness <onboarding@resend.dev>")
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "LEANr Wellness <orders@leanrwellness.com>")
 BREVO_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", BUSINESS_EMAIL)
 BREVO_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "LEANr Wellness")
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
