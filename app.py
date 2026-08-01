@@ -11,6 +11,9 @@ from dotenv import load_dotenv
 import threading
 import sys
 import requests
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 load_dotenv()
 
@@ -34,13 +37,19 @@ BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "LEANr Wellness <onboarding@resend.dev>")
 BREVO_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", BUSINESS_EMAIL)
 BREVO_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "LEANr Wellness")
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME", BUSINESS_EMAIL)
+SMTP_PASSWORD = os.getenv("BUSINESS_EMAIL_PASSWORD", "")
+SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
 
 print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}", flush=True)
 print(f"DEBUG: Resend API key present: {'Yes' if RESEND_API_KEY else 'No - emails will not send'}", flush=True)
 print(f"DEBUG: Brevo API key present: {'Yes' if BREVO_API_KEY else 'No'}", flush=True)
 print(f"DEBUG: Resend from: {RESEND_FROM_EMAIL}", flush=True)
 print(f"DEBUG: Brevo sender: {BREVO_SENDER_NAME} <{BREVO_SENDER_EMAIL}>", flush=True)
-print(f"DEBUG: Email provider priority: Resend, then Brevo, then queue", flush=True)
+print(f"DEBUG: SMTP fallback configured: {'Yes' if SMTP_PASSWORD else 'No'}", flush=True)
+print(f"DEBUG: Email provider priority: Resend, then Brevo, then SMTP, then queue", flush=True)
 
 # Admin credentials
 ADMIN_USERNAME = "admin"
@@ -360,6 +369,8 @@ def get_email_provider_status():
         return "Resend API"
     if BREVO_API_KEY:
         return "Brevo API"
+    if SMTP_PASSWORD:
+        return "SMTP"
     return "Queue only (no provider API key configured)"
 
 def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
@@ -417,7 +428,31 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
             print(f"    ✗ {last_error}", flush=True)
             sys.stdout.flush()
 
-        if not RESEND_API_KEY and not BREVO_API_KEY:
+        if SMTP_PASSWORD:
+            print(f"    Sending via SMTP fallback...", flush=True)
+            try:
+                message = MIMEMultipart("alternative")
+                message["Subject"] = subject
+                message["From"] = BUSINESS_EMAIL
+                message["To"] = recipient
+                message.attach(MIMEText(html_body, "html", "utf-8"))
+
+                server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15)
+                if SMTP_USE_TLS:
+                    server.starttls()
+                server.login(SMTP_USERNAME, SMTP_PASSWORD)
+                server.sendmail(BUSINESS_EMAIL, [recipient], message.as_string())
+                server.quit()
+
+                print(f"    ✓ Email sent successfully via SMTP to {recipient}\n", flush=True)
+                sys.stdout.flush()
+                return True, ""
+            except Exception as smtp_error:
+                last_error = f"SMTP error: {str(smtp_error)}"
+                print(f"    ✗ {last_error}", flush=True)
+                sys.stdout.flush()
+
+        if not RESEND_API_KEY and not BREVO_API_KEY and not SMTP_PASSWORD:
             last_error = "No email provider key configured"
 
         print(f"    ⚠ WARNING: {last_error}", flush=True)
