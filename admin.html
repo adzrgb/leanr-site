@@ -594,7 +594,7 @@
               <div style="margin-top: 0.5rem; font-weight: 600;">Total: £${order.total.toFixed(2)}</div>
             </div>
             <div class="tracking-section">
-              <input type="text" class="tracking-input" placeholder="Enter tracking number..." value="${order.trackingNumber || ''}">
+              <input type="text" class="tracking-input" data-order-number="${order.orderNumber}" placeholder="Enter tracking number..." value="${order.trackingNumber || ''}">
               <button class="send-tracking-btn" onclick="sendTracking('${order.orderNumber}', this)">
                 ${order.trackingNumber ? 'Resend' : 'Send'} Tracking
               </button>
@@ -610,6 +610,18 @@
             </div>
           </div>
         `).join('');
+
+        // Press Enter in tracking input to send/resend immediately.
+        ordersList.querySelectorAll('.tracking-input').forEach(input => {
+          input.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            const btn = input.parentElement.querySelector('.send-tracking-btn');
+            if (btn) {
+              sendTracking(input.dataset.orderNumber, btn);
+            }
+          });
+        });
       } catch (error) {
         document.getElementById('orders-list').innerHTML = `<div class="empty-state">Error loading orders: ${error.message}</div>`;
       }
