@@ -31,10 +31,15 @@ BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "LEANr Wellness <onboarding@resend.dev>")
+BREVO_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", BUSINESS_EMAIL)
+BREVO_SENDER_NAME = os.getenv("BREVO_SENDER_NAME", "LEANr Wellness")
 
 print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}", flush=True)
 print(f"DEBUG: Resend API key present: {'Yes' if RESEND_API_KEY else 'No - emails will not send'}", flush=True)
 print(f"DEBUG: Brevo API key present: {'Yes' if BREVO_API_KEY else 'No'}", flush=True)
+print(f"DEBUG: Resend from: {RESEND_FROM_EMAIL}", flush=True)
+print(f"DEBUG: Brevo sender: {BREVO_SENDER_NAME} <{BREVO_SENDER_EMAIL}>", flush=True)
 print(f"DEBUG: Email provider priority: Resend, then Brevo, then queue", flush=True)
 
 # Admin credentials
@@ -276,28 +281,36 @@ def send_order_emails(data, items_html):
         # Send business email
         print(f"[1/2] Attempting to send BUSINESS email...", flush=True)
         sys.stdout.flush()
-        try:
-            send_email(BUSINESS_EMAIL, f"New Order: {data['orderNumber']}", business_email_body, data['orderNumber'])
+        business_sent, business_error = send_email(
+            BUSINESS_EMAIL,
+            f"New Order: {data['orderNumber']}",
+            business_email_body,
+            data['orderNumber']
+        )
+        if business_sent:
             print(f"✓ Business email sent successfully", flush=True)
-            sys.stdout.flush()
-        except Exception as e:
-            print(f"✗ Business email FAILED: {str(e)}", flush=True)
-            sys.stdout.flush()
-            raise
-        
-        # Send customer email
+        else:
+            print(f"⚠ Business email not delivered immediately: {business_error}", flush=True)
+        sys.stdout.flush()
+
+        # Send customer email (independent from business email result)
         print(f"[2/2] Attempting to send CUSTOMER email...", flush=True)
         sys.stdout.flush()
-        try:
-            send_email(data['customerEmail'], f"Order Confirmation: {data['orderNumber']}", customer_email_body, data['orderNumber'])
+        customer_sent, customer_error = send_email(
+            data['customerEmail'],
+            f"Order Confirmation: {data['orderNumber']}",
+            customer_email_body,
+            data['orderNumber']
+        )
+        if customer_sent:
             print(f"✓ Customer email sent successfully", flush=True)
-            sys.stdout.flush()
-        except Exception as e:
-            print(f"✗ Customer email FAILED: {str(e)}", flush=True)
-            sys.stdout.flush()
-            raise
-        
-        print(f"✓ ALL EMAILS SENT SUCCESSFULLY for order {data['orderNumber']}\n", flush=True)
+        else:
+            print(f"⚠ Customer email not delivered immediately: {customer_error}", flush=True)
+
+        if business_sent and customer_sent:
+            print(f"✓ ALL EMAILS SENT SUCCESSFULLY for order {data['orderNumber']}\n", flush=True)
+        else:
+            print(f"⚠ Order {data['orderNumber']} emails processed with queue fallback\n", flush=True)
         sys.stdout.flush()
     except Exception as e:
         print(f"✗ Email sending failed: {str(e)}", flush=True)
@@ -323,7 +336,7 @@ def save_email_queue(queue):
     with open(EMAIL_QUEUE_FILE, 'w') as f:
         json.dump(queue, f, indent=2)
 
-def queue_email(recipient, subject, html_body, order_id=""):
+def queue_email(recipient, subject, html_body, order_id="", last_error=""):
     """Add email to queue for later sending"""
     queue = load_email_queue()
     queue.append({
@@ -332,10 +345,13 @@ def queue_email(recipient, subject, html_body, order_id=""):
         "htmlContent": html_body,
         "order_id": order_id,
         "queued_at": datetime.now().isoformat(),
-        "status": "pending"
+        "status": "pending",
+        "last_error": last_error
     })
     save_email_queue(queue)
-    print(f"    ⏳ Email QUEUED (awaiting provider activation): {recipient}", flush=True)
+    print(f"    ⏳ Email QUEUED: {recipient}", flush=True)
+    if last_error:
+        print(f"    ⏳ Queue reason: {last_error}", flush=True)
     sys.stdout.flush()
 
 def get_email_provider_status():
@@ -347,10 +363,11 @@ def get_email_provider_status():
     return "Queue only (no provider API key configured)"
 
 def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
-    """Send email via configured provider. Returns True if sent, False otherwise."""
+    """Send email via configured providers. Returns (sent, error_message)."""
     try:
         print(f"\n  → Sending email to {recipient}...", flush=True)
         print(f"    Subject: {subject}", flush=True)
+        last_error = ""
 
         if RESEND_API_KEY:
             print(f"    Sending via Resend API...", flush=True)
@@ -359,7 +376,7 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
                 "Content-Type": "application/json"
             }
             payload = {
-                "from": "LEANr Wellness <orders@leanrwellness.com>",
+                "from": RESEND_FROM_EMAIL,
                 "reply_to": BUSINESS_EMAIL,
                 "to": [recipient],
                 "subject": subject,
@@ -369,13 +386,11 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
             if response.status_code in [200, 201]:
                 print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
                 sys.stdout.flush()
-                return True
+                return True, ""
 
-            print(f"    ✗ Resend API error: {response.status_code} - {response.text}", flush=True)
-            if queue_on_fail:
-                queue_email(recipient, subject, html_body, order_id)
+            last_error = f"Resend API error: {response.status_code} - {response.text}"
+            print(f"    ✗ {last_error}", flush=True)
             sys.stdout.flush()
-            return False
 
         if BREVO_API_KEY:
             print(f"    Sending via Brevo API...", flush=True)
@@ -385,8 +400,8 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
             }
             payload = {
                 "sender": {
-                    "email": BUSINESS_EMAIL,
-                    "name": "LEANr Wellness"
+                    "email": BREVO_SENDER_EMAIL,
+                    "name": BREVO_SENDER_NAME
                 },
                 "to": [{"email": recipient}],
                 "subject": subject,
@@ -396,27 +411,29 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
             if response.status_code in [200, 201, 202]:
                 print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
                 sys.stdout.flush()
-                return True
+                return True, ""
 
-            print(f"    ✗ Brevo API error: {response.status_code} - {response.text}", flush=True)
-            if queue_on_fail:
-                queue_email(recipient, subject, html_body, order_id)
+            last_error = f"Brevo API error: {response.status_code} - {response.text}"
+            print(f"    ✗ {last_error}", flush=True)
             sys.stdout.flush()
-            return False
 
-        print(f"    ⚠ WARNING: No email provider key configured", flush=True)
+        if not RESEND_API_KEY and not BREVO_API_KEY:
+            last_error = "No email provider key configured"
+
+        print(f"    ⚠ WARNING: {last_error}", flush=True)
         if queue_on_fail:
-            queue_email(recipient, subject, html_body, order_id)
-        return False
+            queue_email(recipient, subject, html_body, order_id, last_error)
+        return False, last_error
         
     except Exception as e:
         import traceback
-        print(f"    ✗ Error: {str(e)}", flush=True)
+        last_error = f"Exception: {str(e)}"
+        print(f"    ✗ {last_error}", flush=True)
         traceback.print_exc()
         if queue_on_fail:
-            queue_email(recipient, subject, html_body, order_id)
+            queue_email(recipient, subject, html_body, order_id, last_error)
         sys.stdout.flush()
-        return False
+        return False, last_error
 
 # ==================== ADMIN ENDPOINTS ====================
 
@@ -490,7 +507,7 @@ def retry_all_queued_emails():
         
         for email in queue:
             try:
-                delivered = send_email(
+                delivered, error_message = send_email(
                     email['recipient'],
                     email['subject'],
                     email['htmlContent'],
@@ -502,6 +519,8 @@ def retry_all_queued_emails():
                     sent += 1
                     print(f"✓ Queued email SENT to {email['recipient']}", flush=True)
                 else:
+                    email['last_error'] = error_message
+                    email['last_retry_at'] = datetime.now().isoformat()
                     still_queued.append(email)
                     failed += 1
                     print(f"⚠ Email still queued for {email['recipient']}", flush=True)
