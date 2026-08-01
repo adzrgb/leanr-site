@@ -880,6 +880,18 @@ blockquote footer {
   word-break: break-word;
 }
 
+.royalmail-qr-steps {
+  margin: 0 0 0.9rem 1.1rem;
+  padding: 0;
+  color: #1e293b;
+}
+
+.royalmail-qr-steps li {
+  margin-bottom: 0.4rem;
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
 .royalmail-qr-textarea {
   width: 100%;
   resize: vertical;
@@ -1300,6 +1312,17 @@ blockquote footer {
     font-size: 0.96rem;
     line-height: 1.55;
     margin-bottom: 0.9rem;
+  }
+
+  .royalmail-qr-steps {
+    margin-left: 1.15rem;
+    margin-bottom: 1rem;
+  }
+
+  .royalmail-qr-steps li {
+    font-size: 0.98rem;
+    line-height: 1.5;
+    margin-bottom: 0.45rem;
   }
 
   .royalmail-qr-textarea,
