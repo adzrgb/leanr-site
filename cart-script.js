@@ -125,8 +125,9 @@ function updateRoyalMailQrSection(subtotal) {
   const wrapper = document.getElementById('royalmail-qr-wrapper');
   const checkbox = document.getElementById('use-royalmail-qr');
   const input = document.getElementById('royalmail-qr-code');
+  const photoInput = document.getElementById('royalmail-qr-photo');
 
-  if (!wrapper || !checkbox || !input) return;
+  if (!wrapper || !checkbox || !input || !photoInput) return;
 
   const needsRoyalMailOption = subtotal < 100;
   wrapper.style.display = needsRoyalMailOption ? 'block' : 'none';
@@ -134,7 +135,17 @@ function updateRoyalMailQrSection(subtotal) {
   if (!needsRoyalMailOption) {
     checkbox.checked = false;
     input.value = '';
+    photoInput.value = '';
   }
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Unable to read selected image'));
+    reader.readAsDataURL(file);
+  });
 }
 
 // Handle checkout form submission
@@ -161,9 +172,32 @@ if (checkoutForm) {
     const total = subtotal - discountAmount + postage;
     const useRoyalMailQr = subtotal < 100 && !!document.getElementById('use-royalmail-qr')?.checked;
     const royalMailQrCode = subtotal < 100 ? (document.getElementById('royalmail-qr-code')?.value || '').trim() : '';
+    const royalMailQrPhotoFile = subtotal < 100 ? document.getElementById('royalmail-qr-photo')?.files?.[0] : null;
 
-    if (useRoyalMailQr && !royalMailQrCode) {
-      alert('Please add your Royal Mail QR code/reference, or untick the Royal Mail QR option.');
+    let royalMailQrImageData = '';
+    let royalMailQrImageName = '';
+
+    if (useRoyalMailQr && royalMailQrPhotoFile) {
+      if (!royalMailQrPhotoFile.type.startsWith('image/')) {
+        alert('Royal Mail QR photo must be an image file.');
+        return;
+      }
+      if (royalMailQrPhotoFile.size > 3 * 1024 * 1024) {
+        alert('Royal Mail QR photo must be 3MB or smaller.');
+        return;
+      }
+
+      try {
+        royalMailQrImageData = await readFileAsDataUrl(royalMailQrPhotoFile);
+        royalMailQrImageName = royalMailQrPhotoFile.name || 'royalmail-qr-image';
+      } catch (fileError) {
+        alert(fileError.message);
+        return;
+      }
+    }
+
+    if (useRoyalMailQr && !royalMailQrCode && !royalMailQrImageData) {
+      alert('Please add your Royal Mail QR code/reference or upload a QR photo, or untick the Royal Mail QR option.');
       return;
     }
     
@@ -178,6 +212,8 @@ if (checkoutForm) {
       orderNotes: document.getElementById('order-notes').value || '',
       useRoyalMailQr: useRoyalMailQr,
       royalMailQrCode: royalMailQrCode,
+      royalMailQrImageData: royalMailQrImageData,
+      royalMailQrImageName: royalMailQrImageName,
       items: cart,
       subtotal: subtotal,
       discountAmount: discountAmount,

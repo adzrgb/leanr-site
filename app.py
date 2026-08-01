@@ -190,6 +190,18 @@ def send_order_emails(data, items_html):
         print(f"Business email: {BUSINESS_EMAIL}", flush=True)
         print(f"{'='*60}\n", flush=True)
         sys.stdout.flush()
+
+        qr_reference = data.get('royalMailQrCode', '')
+        qr_reference_safe = qr_reference.replace('<', '&lt;').replace('>', '&gt;')
+        qr_image_data = data.get('royalMailQrImageData', '')
+        qr_image_name = data.get('royalMailQrImageName', 'Royal Mail QR')
+        qr_image_name_safe = qr_image_name.replace('<', '&lt;').replace('>', '&gt;')
+        qr_image_html = ''
+        if qr_image_data:
+            qr_image_html = f'''
+                        <p><strong>QR Photo:</strong> {qr_image_name_safe}</p>
+                        <img src="{qr_image_data}" alt="Royal Mail QR" style="max-width: 280px; width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px;" />
+            '''
         
         # Business email body
         business_email_body = f"""
@@ -228,8 +240,9 @@ def send_order_emails(data, items_html):
                     {f'''<div class="order-details">
                         <h3>Royal Mail QR</h3>
                         <p><strong>Customer selected Royal Mail QR option:</strong> Yes</p>
-                        <p><strong>QR Code / Reference:</strong><br>{data.get('royalMailQrCode', '').replace('<', '&lt;').replace('>', '&gt;')}</p>
+                        <p><strong>QR Code / Reference:</strong><br>{qr_reference_safe}</p>
                         <p><strong>Link:</strong> https://send.royalmail.com/ (Small Parcel)</p>
+                        {qr_image_html}
                     </div>''' if data.get('useRoyalMailQr') else ''}
                     
                     <h3>Order Items</h3>
@@ -296,7 +309,8 @@ def send_order_emails(data, items_html):
                     {f'''<div class="order-details">
                         <h3>Royal Mail QR (Under £100 Orders)</h3>
                         <p>You selected Royal Mail QR postage. Please use <strong>Small Parcel</strong> on <a href="https://send.royalmail.com/">send.royalmail.com</a>.</p>
-                        <p><strong>Your QR Code / Reference:</strong><br>{data.get('royalMailQrCode', '').replace('<', '&lt;').replace('>', '&gt;')}</p>
+                        <p><strong>Your QR Code / Reference:</strong><br>{qr_reference_safe}</p>
+                        {qr_image_html}
                     </div>''' if data.get('useRoyalMailQr') else ''}
                 </div>
             </body>
