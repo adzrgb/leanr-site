@@ -1287,7 +1287,12 @@ def serve_cart():
 def serve_admin():
     """Serve admin.html"""
     with open('admin.html') as f:
-        return f.read()
+        return f.read(), 200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
 
 # Serve CSS and JavaScript files
 @app.route('/styles.css')
