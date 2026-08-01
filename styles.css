@@ -1199,8 +1199,19 @@ blockquote footer {
   }
 
   .cart-header span:not(:first-child),
-  .cart-item-row > *:not(:first-child) {
+  .cart-item-row > *:not(:first-child):not(.remove-btn) {
     display: none;
+  }
+
+  .cart-item-row {
+    position: relative;
+  }
+
+  .cart-item-row .remove-btn {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    display: inline-block;
   }
 
   .cart-header::after,
