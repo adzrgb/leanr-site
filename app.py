@@ -1003,10 +1003,21 @@ def update_stock():
         if not verify_token(token):
             return jsonify({'error': 'Invalid token'}), 401
         
-        data = request.json
+        data = request.json or {}
         product_name = data.get('productName')
         variant = data.get('variant')
         new_stock = data.get('stock')
+
+        if not product_name or not variant:
+            return jsonify({'error': 'Missing product or variant'}), 400
+
+        try:
+            new_stock = int(new_stock)
+        except (TypeError, ValueError):
+            return jsonify({'error': 'Stock must be a whole number'}), 400
+
+        if new_stock < 0:
+            return jsonify({'error': 'Stock cannot be negative'}), 400
         
         with open(STOCK_FILE, 'r') as f:
             stock_data = json.load(f)
@@ -1014,8 +1025,13 @@ def update_stock():
         if product_name not in stock_data:
             return jsonify({'error': 'Product not found'}), 404
         
+        updated = False
+
         if variant == 'default':
+            if not isinstance(stock_data[product_name], dict):
+                return jsonify({'error': 'Invalid product stock format'}), 400
             stock_data[product_name]['stock'] = new_stock
+            updated = True
         else:
             # Find and update variant
             product = stock_data[product_name]
@@ -1023,13 +1039,17 @@ def update_stock():
                 for v in product:
                     if v['name'] == variant:
                         v['stock'] = new_stock
+                        updated = True
                         break
+
+        if not updated:
+            return jsonify({'error': 'Variant not found'}), 404
         
         with open(STOCK_FILE, 'w') as f:
             json.dump(stock_data, f, indent=2)
         
         print(f"✓ Updated stock: {product_name} {variant} = {new_stock}")
-        return jsonify({'success': True, 'message': 'Stock updated'}), 200
+        return jsonify({'success': True, 'message': 'Stock updated', 'stock': new_stock}), 200
     except Exception as e:
         print(f"ERROR: {str(e)}")
         return jsonify({'error': str(e)}), 500

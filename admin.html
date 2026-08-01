@@ -710,21 +710,27 @@
       const product = input.dataset.product;
       const variant = input.dataset.variant;
       const key = `${product}|${variant}`;
+      const parsed = parseInt(input.value, 10);
+
+      if (!Number.isInteger(parsed) || parsed < 0) {
+        delete stockChanges[key];
+        return;
+      }
       
       stockChanges[key] = {
         productName: product,
         variant: variant,
-        stock: parseInt(input.value)
+        stock: parsed
       };
     }
     
     async function saveAllStockChanges() {
-      const changes = Object.values(stockChanges);
+      const changes = Object.values(stockChanges).filter(change => Number.isInteger(change.stock) && change.stock >= 0);
       
       if (changes.length === 0) {
         const msg = document.getElementById('stock-message');
         msg.className = 'message';
-        msg.textContent = 'No changes to save';
+        msg.textContent = 'No valid changes to save';
         return;
       }
       
@@ -754,6 +760,9 @@
         const msg = document.getElementById('stock-message');
         msg.className = 'message success';
         msg.textContent = `✓ Successfully saved ${changes.length} change${changes.length === 1 ? '' : 's'}!`;
+
+        // Re-fetch after save so admin always sees persisted values.
+        await loadStockLevels();
         
         setTimeout(() => {
           msg.className = 'message';
