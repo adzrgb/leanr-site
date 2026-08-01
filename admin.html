@@ -658,6 +658,7 @@
     
     // Track stock changes
     let stockChanges = {};
+    let loadedStockValues = {};
     
     async function loadStockLevels() {
       try {
@@ -672,6 +673,7 @@
         
         // Reset changes tracker
         stockChanges = {};
+        loadedStockValues = {};
         
         grid.innerHTML = data.stock.map(product => `
           <div class="stock-card">
@@ -685,6 +687,7 @@
                   value="${variant.stock}" 
                   data-product="${product.name}"
                   data-variant="${variant.name}"
+                  oninput="trackStockChange(this)"
                   onchange="trackStockChange(this)">
               </div>
             `).join('') : `
@@ -696,11 +699,18 @@
                   value="${product.stock}"
                   data-product="${product.name}"
                   data-variant="default"
+                  oninput="trackStockChange(this)"
                   onchange="trackStockChange(this)">
               </div>
             `}
           </div>
         `).join('');
+
+        // Capture baseline values to reliably detect changes at save time.
+        grid.querySelectorAll('input[type="number"]').forEach(input => {
+          const key = `${input.dataset.product}|${input.dataset.variant}`;
+          loadedStockValues[key] = parseInt(input.value, 10);
+        });
       } catch (error) {
         document.getElementById('stock-grid').innerHTML = `<div class="empty-state">Error loading stock: ${error.message}</div>`;
       }
@@ -725,7 +735,30 @@
     }
     
     async function saveAllStockChanges() {
-      const changes = Object.values(stockChanges).filter(change => Number.isInteger(change.stock) && change.stock >= 0);
+      const inputNodes = Array.from(document.querySelectorAll('#stock-grid input[type="number"]'));
+      const changes = [];
+
+      for (const input of inputNodes) {
+        const product = input.dataset.product;
+        const variant = input.dataset.variant;
+        const key = `${product}|${variant}`;
+        const parsed = parseInt(input.value, 10);
+
+        if (!Number.isInteger(parsed) || parsed < 0) {
+          const msg = document.getElementById('stock-message');
+          msg.className = 'message error';
+          msg.textContent = `✗ Invalid stock value for ${product} ${variant}`;
+          return;
+        }
+
+        if (loadedStockValues[key] !== parsed) {
+          changes.push({
+            productName: product,
+            variant,
+            stock: parsed
+          });
+        }
+      }
       
       if (changes.length === 0) {
         const msg = document.getElementById('stock-message');
