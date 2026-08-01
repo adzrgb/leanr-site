@@ -57,6 +57,20 @@ print(f"DEBUG: Brevo sender: {BREVO_SENDER_NAME} <{BREVO_SENDER_EMAIL}>", flush=
 print(f"DEBUG: SMTP fallback configured: {'Yes' if SMTP_PASSWORD else 'No'}", flush=True)
 print(f"DEBUG: Email provider priority: Resend, then Brevo, then SMTP, then queue", flush=True)
 
+# Optional Supabase state storage (orders/stock/newsletter/queue).
+# Email confirmation logic stays unchanged; only persistence backend changes.
+SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_STATE_TABLE = os.getenv("SUPABASE_STATE_TABLE", "app_state")
+SUPABASE_STATE_KEY_COLUMN = os.getenv("SUPABASE_STATE_KEY_COLUMN", "state_key")
+SUPABASE_STATE_VALUE_COLUMN = os.getenv("SUPABASE_STATE_VALUE_COLUMN", "state_value")
+SUPABASE_ENABLED = bool(SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)
+
+if SUPABASE_ENABLED:
+    print(f"DEBUG: Supabase storage enabled via table '{SUPABASE_STATE_TABLE}'", flush=True)
+else:
+    print("DEBUG: Supabase storage disabled (using local files)", flush=True)
+
 # Admin credentials
 ADMIN_USERNAME = "admin"
 ADMIN_PASSWORD_HASH = hashlib.sha256("Qx7m#K2$pL9@vN4b".encode()).hexdigest()
@@ -74,6 +88,11 @@ STOCK_FILE = os.path.join(DATA_DIR, "stock.json")
 EMAILS_FILE = os.path.join(DATA_DIR, "newsletter_emails.json")
 EMAIL_QUEUE_FILE = os.path.join(DATA_DIR, "email_queue.json")
 
+ORDERS_KEY = "orders"
+STOCK_KEY = "stock"
+EMAILS_KEY = "newsletter_emails"
+EMAIL_QUEUE_KEY = "email_queue"
+
 print(f"DEBUG: DATA_DIR in use: {DATA_DIR}", flush=True)
 
 def _seed_data_file(file_path, fallback_name):
@@ -87,33 +106,140 @@ def _seed_data_file(file_path, fallback_name):
         except Exception as copy_error:
             print(f"WARN: Could not seed {file_path}: {copy_error}", flush=True)
 
+def _load_local_json(file_path, default):
+    """Load JSON from local file, returning default if missing/invalid."""
+    if os.path.exists(file_path):
+        try:
+            with open(file_path, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"WARN: Failed reading {file_path}: {e}", flush=True)
+    return default
+
+def _save_local_json(file_path, data):
+    """Save JSON to local file."""
+    with open(file_path, 'w') as f:
+        json.dump(data, f, indent=2)
+
+def _supabase_headers():
+    return {
+        "apikey": SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {SUPABASE_SERVICE_ROLE_KEY}",
+        "Content-Type": "application/json"
+    }
+
+def _supabase_load_state(data_key):
+    """Load JSON state blob from Supabase table using REST API."""
+    if not SUPABASE_ENABLED:
+        return None
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/{SUPABASE_STATE_TABLE}"
+        params = {
+            SUPABASE_STATE_KEY_COLUMN: f"eq.{data_key}",
+            "select": SUPABASE_STATE_VALUE_COLUMN,
+            "limit": "1"
+        }
+        response = requests.get(url, headers=_supabase_headers(), params=params, timeout=10)
+        if response.status_code != 200:
+            print(f"WARN: Supabase read failed for '{data_key}': {response.status_code} {response.text}", flush=True)
+            return None
+        rows = response.json() or []
+        if not rows:
+            return None
+        return rows[0].get(SUPABASE_STATE_VALUE_COLUMN)
+    except Exception as e:
+        print(f"WARN: Supabase read exception for '{data_key}': {e}", flush=True)
+        return None
+
+def _supabase_save_state(data_key, data):
+    """Upsert JSON state blob into Supabase table using REST API."""
+    if not SUPABASE_ENABLED:
+        return False
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/{SUPABASE_STATE_TABLE}"
+        params = {"on_conflict": SUPABASE_STATE_KEY_COLUMN}
+        headers = _supabase_headers()
+        headers["Prefer"] = "resolution=merge-duplicates,return=minimal"
+        payload = [{
+            SUPABASE_STATE_KEY_COLUMN: data_key,
+            SUPABASE_STATE_VALUE_COLUMN: data
+        }]
+        response = requests.post(url, headers=headers, params=params, json=payload, timeout=10)
+        if response.status_code in (200, 201):
+            return True
+        print(f"WARN: Supabase write failed for '{data_key}': {response.status_code} {response.text}", flush=True)
+        return False
+    except Exception as e:
+        print(f"WARN: Supabase write exception for '{data_key}': {e}", flush=True)
+        return False
+
+def load_state(data_key, file_path, default):
+    """Load state from Supabase when configured, otherwise local file."""
+    remote = _supabase_load_state(data_key)
+    if remote is not None:
+        return remote
+    return _load_local_json(file_path, default)
+
+def save_state(data_key, file_path, data):
+    """Save state to Supabase when configured, and also mirror to local file."""
+    _supabase_save_state(data_key, data)
+    _save_local_json(file_path, data)
+
+def load_orders_data():
+    return load_state(ORDERS_KEY, ORDERS_FILE, [])
+
+def save_orders_data(orders):
+    save_state(ORDERS_KEY, ORDERS_FILE, orders)
+
+def load_stock_data():
+    return load_state(STOCK_KEY, STOCK_FILE, {})
+
+def save_stock_data(stock):
+    save_state(STOCK_KEY, STOCK_FILE, stock)
+
+def load_newsletter_data():
+    return load_state(EMAILS_KEY, EMAILS_FILE, [])
+
+def save_newsletter_data(emails):
+    save_state(EMAILS_KEY, EMAILS_FILE, emails)
+
+def load_email_queue_data():
+    return load_state(EMAIL_QUEUE_KEY, EMAIL_QUEUE_FILE, [])
+
+def save_email_queue_data(queue):
+    save_state(EMAIL_QUEUE_KEY, EMAIL_QUEUE_FILE, queue)
+
 # Initialize stock file if it doesn't exist
+default_stock = {
+    "RETATRUTIDE": [
+        {"name": "20mg", "stock": 50},
+        {"name": "40mg", "stock": 50}
+    ],
+    "TIRZEPETIDE": [
+        {"name": "30mg", "stock": 50},
+        {"name": "60mg", "stock": 50}
+    ],
+    "MT1": [
+        {"name": "Vial", "stock": 50},
+        {"name": "Pen", "stock": 50}
+    ],
+    "GHK-CU": [
+        {"name": "Vial", "stock": 50},
+        {"name": "Pen", "stock": 50}
+    ],
+    "KLOW PEN": {"stock": 50},
+    "CAGRI": {"stock": 50}
+}
+
 if not os.path.exists(STOCK_FILE):
     _seed_data_file(STOCK_FILE, "stock.json")
 
 if not os.path.exists(STOCK_FILE):
-    default_stock = {
-        "RETATRUTIDE": [
-            {"name": "20mg", "stock": 50},
-            {"name": "40mg", "stock": 50}
-        ],
-        "TIRZEPETIDE": [
-            {"name": "30mg", "stock": 50},
-            {"name": "60mg", "stock": 50}
-        ],
-        "MT1": [
-            {"name": "Vial", "stock": 50},
-            {"name": "Pen", "stock": 50}
-        ],
-        "GHK-CU": [
-            {"name": "Vial", "stock": 50},
-            {"name": "Pen", "stock": 50}
-        ],
-        "KLOW PEN": {"stock": 50},
-        "CAGRI": {"stock": 50}
-    }
     with open(STOCK_FILE, 'w') as f:
         json.dump(default_stock, f)
+
+if not load_stock_data():
+    save_stock_data(default_stock)
 
 _seed_data_file(ORDERS_FILE, "orders.json")
 _seed_data_file(EMAILS_FILE, "newsletter_emails.json")
@@ -156,11 +282,8 @@ def send_order():
             </tr>
             """
         
-        # Save order to JSON file FIRST
-        orders = []
-        if os.path.exists(ORDERS_FILE):
-            with open(ORDERS_FILE, 'r') as f:
-                orders = json.load(f)
+        # Save order FIRST
+        orders = load_orders_data()
         
         order_record = {
             'orderNumber': data['orderNumber'],
@@ -184,8 +307,7 @@ def send_order():
         }
         
         orders.append(order_record)
-        with open(ORDERS_FILE, 'w') as f:
-            json.dump(orders, f, indent=2)
+        save_orders_data(orders)
         
         print(f"✓ Order saved to database")
         
@@ -388,18 +510,14 @@ def send_order_emails(data, items_html):
 
 def load_email_queue():
     """Load email queue from file"""
-    if os.path.exists(EMAIL_QUEUE_FILE):
-        try:
-            with open(EMAIL_QUEUE_FILE, 'r') as f:
-                return json.load(f)
-        except:
-            return []
-    return []
+    try:
+        return load_email_queue_data()
+    except Exception:
+        return []
 
 def save_email_queue(queue):
     """Save email queue to file"""
-    with open(EMAIL_QUEUE_FILE, 'w') as f:
-        json.dump(queue, f, indent=2)
+    save_email_queue_data(queue)
 
 def queue_email(recipient, subject, html_body, order_id="", last_error="", attachments=None):
     """Add email to queue for later sending"""
@@ -785,10 +903,7 @@ def get_orders():
         if not verify_token(token):
             return jsonify({'error': 'Invalid token'}), 401
         
-        orders = []
-        if os.path.exists(ORDERS_FILE):
-            with open(ORDERS_FILE, 'r') as f:
-                orders = json.load(f)
+        orders = load_orders_data()
         
         print(f"✓ Retrieved {len(orders)} orders")
         return jsonify({'orders': orders}), 200
@@ -817,10 +932,7 @@ def delete_order():
         if not order_number:
             return jsonify({'error': 'Missing order number'}), 400
 
-        orders = []
-        if os.path.exists(ORDERS_FILE):
-            with open(ORDERS_FILE, 'r') as f:
-                orders = json.load(f)
+        orders = load_orders_data()
 
         original_count = len(orders)
         filtered_orders = [o for o in orders if o.get('orderNumber') != order_number]
@@ -828,8 +940,7 @@ def delete_order():
         if len(filtered_orders) == original_count:
             return jsonify({'error': 'Order not found'}), 404
 
-        with open(ORDERS_FILE, 'w') as f:
-            json.dump(filtered_orders, f, indent=2)
+        save_orders_data(filtered_orders)
 
         print(f"✓ Deleted order {order_number}")
         return jsonify({'success': True, 'message': f'Order {order_number} deleted'}), 200
@@ -865,10 +976,7 @@ def send_tracking():
             return jsonify({'error': 'Tracking number is required'}), 400
         
         # Find order and update
-        orders = []
-        if os.path.exists(ORDERS_FILE):
-            with open(ORDERS_FILE, 'r') as f:
-                orders = json.load(f)
+        orders = load_orders_data()
         
         order = next((o for o in orders if o['orderNumber'] == order_number), None)
         if not order:
@@ -876,8 +984,7 @@ def send_tracking():
         
         # Update tracking number
         order['trackingNumber'] = tracking_number
-        with open(ORDERS_FILE, 'w') as f:
-            json.dump(orders, f, indent=2)
+        save_orders_data(orders)
         
         # Send email to customer
         tracking_email_body = f"""
@@ -959,10 +1066,7 @@ def confirm_payment():
             return jsonify({'error': 'Order number is required'}), 400
         
         # Find order and update
-        orders = []
-        if os.path.exists(ORDERS_FILE):
-            with open(ORDERS_FILE, 'r') as f:
-                orders = json.load(f)
+        orders = load_orders_data()
         
         order = next((o for o in orders if o['orderNumber'] == order_number), None)
         if not order:
@@ -970,8 +1074,7 @@ def confirm_payment():
         
         # Mark payment as confirmed
         order['paymentConfirmed'] = True
-        with open(ORDERS_FILE, 'w') as f:
-            json.dump(orders, f, indent=2)
+        save_orders_data(orders)
         
         # Send payment confirmation email to customer
         payment_confirmation_body = f"""
@@ -1108,8 +1211,7 @@ def get_stock():
         if not verify_token(token):
             return jsonify({'error': 'Invalid token'}), 401
         
-        with open(STOCK_FILE, 'r') as f:
-            stock_data = json.load(f)
+        stock_data = load_stock_data()
         
         # Format for frontend
         stock_list = []
@@ -1162,8 +1264,7 @@ def update_stock():
         if new_stock < 0:
             return jsonify({'error': 'Stock cannot be negative'}), 400
         
-        with open(STOCK_FILE, 'r') as f:
-            stock_data = json.load(f)
+        stock_data = load_stock_data()
         
         if product_name not in stock_data:
             return jsonify({'error': 'Product not found'}), 404
@@ -1188,8 +1289,7 @@ def update_stock():
         if not updated:
             return jsonify({'error': 'Variant not found'}), 404
         
-        with open(STOCK_FILE, 'w') as f:
-            json.dump(stock_data, f, indent=2)
+        save_stock_data(stock_data)
         
         print(f"✓ Updated stock: {product_name} {variant} = {new_stock}")
         return jsonify({'success': True, 'message': 'Stock updated', 'stock': new_stock}), 200
@@ -1201,8 +1301,7 @@ def update_stock():
 @app.route('/api/public/stock', methods=['GET'])
 def get_public_stock():
     try:
-        with open(STOCK_FILE, 'r') as f:
-            stock_data = json.load(f)
+        stock_data = load_stock_data()
         
         # Format stock data for frontend
         stock_list = []
@@ -1239,10 +1338,7 @@ def newsletter_subscribe():
             return jsonify({'error': 'Email required'}), 400
         
         # Load existing emails
-        emails = []
-        if os.path.exists(EMAILS_FILE):
-            with open(EMAILS_FILE, 'r') as f:
-                emails = json.load(f)
+        emails = load_newsletter_data()
         
         # Check if already subscribed
         if email in emails:
@@ -1250,8 +1346,7 @@ def newsletter_subscribe():
         
         # Add new email
         emails.append(email)
-        with open(EMAILS_FILE, 'w') as f:
-            json.dump(emails, f, indent=2)
+        save_newsletter_data(emails)
         
         print(f"✓ Newsletter subscription: {email}")
         return jsonify({'success': True, 'message': 'Subscribed successfully'}), 200
@@ -1272,10 +1367,7 @@ def get_stats():
         if not verify_token(token):
             return jsonify({'error': 'Invalid token'}), 401
         
-        orders = []
-        if os.path.exists(ORDERS_FILE):
-            with open(ORDERS_FILE, 'r') as f:
-                orders = json.load(f)
+        orders = load_orders_data()
         
         # Calculate stats
         total_revenue = sum(o.get('total', o.get('subtotal', 0)) for o in orders)
