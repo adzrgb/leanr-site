@@ -97,7 +97,14 @@
     .order-header {
       display: flex;
       justify-content: space-between;
+      align-items: center;
       margin-bottom: 1rem;
+    }
+
+    .order-header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
     }
     
     .order-number {
@@ -108,6 +115,26 @@
     .order-date {
       color: #64748b;
       font-size: 0.9rem;
+    }
+
+    .delete-order-btn {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+
+    .delete-order-btn:hover {
+      background: #fecaca;
     }
     
     .order-customer {
@@ -550,7 +577,10 @@
           <div class="order-card">
             <div class="order-header">
               <span class="order-number">${order.orderNumber}</span>
-              <span class="order-date">${new Date(order.timestamp).toLocaleDateString()}</span>
+              <div class="order-header-right">
+                <span class="order-date">${new Date(order.timestamp).toLocaleDateString()}</span>
+                <button class="delete-order-btn" onclick="deleteOrder('${order.orderNumber}', this)" title="Delete order" aria-label="Delete order">&times;</button>
+              </div>
             </div>
             <div class="order-customer">
               <strong>${order.customerName}</strong><br>
@@ -788,6 +818,43 @@
         alert('Error: ' + error.message);
         button.disabled = false;
         button.textContent = 'Confirm Payment';
+      }
+    }
+
+    async function deleteOrder(orderNumber, button) {
+      const confirmed = confirm(`Delete order ${orderNumber}? This cannot be undone.`);
+      if (!confirmed) return;
+
+      const token = localStorage.getItem('admin_token');
+      button.disabled = true;
+
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/delete-order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ orderNumber })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          const msg = document.getElementById('orders-message');
+          msg.className = 'message success';
+          msg.textContent = `Order ${orderNumber} deleted.`;
+          setTimeout(() => msg.className = 'message', 3000);
+
+          await loadOrders();
+          await loadRevenue();
+        } else {
+          alert(data.error || 'Failed to delete order');
+          button.disabled = false;
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+        button.disabled = false;
       }
     }
     

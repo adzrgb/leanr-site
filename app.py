@@ -681,6 +681,49 @@ def get_orders():
         print(f"ERROR: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/admin/delete-order', methods=['POST', 'OPTIONS'])
+def delete_order():
+    """Delete an order from admin dashboard"""
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        # Verify token
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        token = auth_header.replace('Bearer ', '')
+        if not verify_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+
+        data = request.json or {}
+        order_number = data.get('orderNumber')
+        if not order_number:
+            return jsonify({'error': 'Missing order number'}), 400
+
+        orders = []
+        if os.path.exists(ORDERS_FILE):
+            with open(ORDERS_FILE, 'r') as f:
+                orders = json.load(f)
+
+        original_count = len(orders)
+        filtered_orders = [o for o in orders if o.get('orderNumber') != order_number]
+
+        if len(filtered_orders) == original_count:
+            return jsonify({'error': 'Order not found'}), 404
+
+        with open(ORDERS_FILE, 'w') as f:
+            json.dump(filtered_orders, f, indent=2)
+
+        print(f"✓ Deleted order {order_number}")
+        return jsonify({'success': True, 'message': f'Order {order_number} deleted'}), 200
+    except Exception as e:
+        import traceback
+        print(f"ERROR: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/admin/send-tracking', methods=['POST', 'OPTIONS'])
 def send_tracking():
     """Send tracking number to customer"""
