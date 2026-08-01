@@ -926,8 +926,11 @@ def confirm_payment():
         if not verify_token(token):
             return jsonify({'error': 'Invalid token'}), 401
         
-        data = request.json
+        data = request.json or {}
         order_number = data.get('orderNumber')
+
+        if not order_number:
+            return jsonify({'error': 'Order number is required'}), 400
         
         # Find order and update
         orders = []
@@ -1041,12 +1044,22 @@ def confirm_payment():
         </html>
         """
         
-        send_email(
-            order['customerEmail'],
+        customer_email = order.get('customerEmail') or order.get('email')
+        if not customer_email:
+            return jsonify({'error': 'Customer email not found for this order'}), 400
+
+        sent, send_error = send_email(
+            customer_email,
             f"Payment Confirmed - Order {order_number}",
             payment_confirmation_body,
             order_number
         )
+
+        if not sent:
+            return jsonify({
+                'error': 'Payment was confirmed but email could not be delivered immediately',
+                'details': send_error
+            }), 502
         
         print(f"✓ Payment confirmation email sent for order {order_number}")
         return jsonify({'success': True, 'message': 'Payment confirmed and email sent to customer'}), 200
