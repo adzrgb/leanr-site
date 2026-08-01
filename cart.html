@@ -113,17 +113,17 @@
                   <textarea id="order-notes" name="order-notes" placeholder="e.g., Leave with neighbour, Special instructions..." style="resize: vertical; min-height: 80px;"></textarea>
                 </div>
 
-                <div class="form-group" id="royalmail-qr-wrapper" style="display: none; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.9rem;">
-                  <label style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;">
+                <div class="form-group royalmail-qr-box" id="royalmail-qr-wrapper" style="display: none;">
+                  <label class="royalmail-qr-toggle">
                     <input type="checkbox" id="use-royalmail-qr" />
                     <span>Add Royal Mail QR code for this order (under £100)</span>
                   </label>
-                  <p style="margin: 0 0 0.65rem 0; font-size: 0.92rem; color: #475569;">
+                  <p class="royalmail-qr-help">
                     Buy postage here: <a href="https://send.royalmail.com/" target="_blank" rel="noopener noreferrer">send.royalmail.com</a> and choose <strong>Small Parcel</strong>.
                   </p>
                   <label for="royalmail-qr-code">Royal Mail QR code / reference (optional)</label>
-                  <textarea id="royalmail-qr-code" name="royalmail-qr-code" placeholder="Paste QR code reference or notes from Royal Mail" style="resize: vertical; min-height: 70px;"></textarea>
-                  <label for="royalmail-qr-photo" style="margin-top: 0.6rem; display: block;">Royal Mail QR photo (optional)</label>
+                  <textarea id="royalmail-qr-code" name="royalmail-qr-code" placeholder="Paste QR code reference or notes from Royal Mail" class="royalmail-qr-textarea"></textarea>
+                  <label for="royalmail-qr-photo" class="royalmail-qr-photo-label">Royal Mail QR photo (optional)</label>
                   <input type="file" id="royalmail-qr-photo" name="royalmail-qr-photo" accept="image/*" />
                 </div>
 

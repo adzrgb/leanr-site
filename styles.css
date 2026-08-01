@@ -846,6 +846,64 @@ blockquote footer {
   box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.1);
 }
 
+.royalmail-qr-box {
+  background: linear-gradient(135deg, #f8fbff, #fef2f8);
+  border: 1px solid #cbd5e1;
+  border-radius: 0.8rem;
+  padding: 1rem;
+}
+
+.royalmail-qr-toggle {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  margin-bottom: 0.65rem;
+  line-height: 1.45;
+}
+
+.royalmail-qr-toggle input[type="checkbox"] {
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: 0.1rem;
+  flex: 0 0 auto;
+}
+
+.royalmail-qr-help {
+  margin: 0 0 0.8rem 0;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.royalmail-qr-help a {
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.royalmail-qr-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 84px;
+  padding: 0.8rem;
+  border: 2px solid var(--primary-blue);
+  border-radius: 0.6rem;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.royalmail-qr-photo-label {
+  margin-top: 0.7rem;
+  display: block;
+}
+
+.royalmail-qr-box input[type="file"] {
+  width: 100%;
+  border: 1px dashed #94a3b8;
+  border-radius: 0.55rem;
+  padding: 0.5rem;
+  background: #fff;
+}
+
 .payment-info {
   background: linear-gradient(135deg, rgba(224, 242, 254, 0.5), rgba(252, 228, 236, 0.5));
   padding: 1rem;
@@ -1223,6 +1281,36 @@ blockquote footer {
 
   .footer-content {
     grid-template-columns: 1fr;
+  }
+
+  .checkout-section {
+    padding: 1.2rem;
+  }
+
+  .royalmail-qr-box {
+    padding: 0.9rem;
+  }
+
+  .royalmail-qr-toggle {
+    gap: 0.6rem;
+    font-size: 0.98rem;
+  }
+
+  .royalmail-qr-help {
+    font-size: 0.96rem;
+    line-height: 1.55;
+    margin-bottom: 0.9rem;
+  }
+
+  .royalmail-qr-textarea,
+  .form-group input,
+  .form-group textarea {
+    font-size: 16px;
+  }
+
+  .payment-info {
+    font-size: 0.98rem;
+    line-height: 1.5;
   }
 
   .signup-form {
