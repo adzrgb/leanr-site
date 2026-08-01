@@ -12,8 +12,11 @@ import threading
 import sys
 import requests
 import smtplib
+import base64
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
 
 load_dotenv()
 
@@ -194,14 +197,9 @@ def send_order_emails(data, items_html):
         qr_reference = data.get('royalMailQrCode', '')
         qr_reference_safe = qr_reference.replace('<', '&lt;').replace('>', '&gt;')
         qr_image_data = data.get('royalMailQrImageData', '')
-        qr_image_name = data.get('royalMailQrImageName', 'Royal Mail QR')
-        qr_image_name_safe = qr_image_name.replace('<', '&lt;').replace('>', '&gt;')
-        qr_image_html = ''
-        if qr_image_data:
-            qr_image_html = f'''
-                        <p><strong>QR Photo:</strong> {qr_image_name_safe}</p>
-                        <img src="{qr_image_data}" alt="Royal Mail QR" style="max-width: 280px; width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px;" />
-            '''
+        qr_image_name = (data.get('royalMailQrImageName', 'royalmail-qr') or 'royalmail-qr').rsplit('.', 1)[0]
+        qr_photo_attachment = parse_data_url_attachment(qr_image_data, qr_image_name)
+        qr_attachments = [qr_photo_attachment] if qr_photo_attachment else []
         
         # Business email body
         business_email_body = f"""
@@ -242,7 +240,7 @@ def send_order_emails(data, items_html):
                         <p><strong>Customer selected Royal Mail QR option:</strong> Yes</p>
                         <p><strong>QR Code / Reference:</strong><br>{qr_reference_safe}</p>
                         <p><strong>Link:</strong> https://send.royalmail.com/ (Small Parcel)</p>
-                        {qr_image_html}
+                        {"<p><strong>QR Photo:</strong> Attached to this email.</p>" if qr_photo_attachment else ""}
                     </div>''' if data.get('useRoyalMailQr') else ''}
                     
                     <h3>Order Items</h3>
@@ -310,7 +308,7 @@ def send_order_emails(data, items_html):
                         <h3>Royal Mail QR (Under £100 Orders)</h3>
                         <p>You selected Royal Mail QR postage. Please use <strong>Small Parcel</strong> on <a href="https://send.royalmail.com/">send.royalmail.com</a>.</p>
                         <p><strong>Your QR Code / Reference:</strong><br>{qr_reference_safe}</p>
-                        {qr_image_html}
+                        {"<p><strong>Your QR Photo:</strong> Attached to this email.</p>" if qr_photo_attachment else ""}
                     </div>''' if data.get('useRoyalMailQr') else ''}
                 </div>
             </body>
@@ -324,7 +322,8 @@ def send_order_emails(data, items_html):
             BUSINESS_EMAIL,
             f"New Order: {data['orderNumber']}",
             business_email_body,
-            data['orderNumber']
+            data['orderNumber'],
+            attachments=qr_attachments
         )
         if business_sent:
             print(f"✓ Business email sent successfully", flush=True)
@@ -339,7 +338,8 @@ def send_order_emails(data, items_html):
             data['customerEmail'],
             f"Order Confirmation: {data['orderNumber']}",
             customer_email_body,
-            data['orderNumber']
+            data['orderNumber'],
+            attachments=qr_attachments
         )
         if customer_sent:
             print(f"✓ Customer email sent successfully", flush=True)
@@ -375,7 +375,7 @@ def save_email_queue(queue):
     with open(EMAIL_QUEUE_FILE, 'w') as f:
         json.dump(queue, f, indent=2)
 
-def queue_email(recipient, subject, html_body, order_id="", last_error=""):
+def queue_email(recipient, subject, html_body, order_id="", last_error="", attachments=None):
     """Add email to queue for later sending"""
     queue = load_email_queue()
     queue.append({
@@ -383,6 +383,7 @@ def queue_email(recipient, subject, html_body, order_id="", last_error=""):
         "subject": subject,
         "htmlContent": html_body,
         "order_id": order_id,
+        "attachments": attachments or [],
         "queued_at": datetime.now().isoformat(),
         "status": "pending",
         "last_error": last_error
@@ -403,12 +404,13 @@ def get_email_provider_status():
         return "SMTP"
     return "Queue only (no provider API key configured)"
 
-def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
+def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True, attachments=None):
     """Send email via configured providers. Returns (sent, error_message)."""
     try:
         print(f"\n  → Sending email to {recipient}...", flush=True)
         print(f"    Subject: {subject}", flush=True)
         attempt_errors = []
+        normalized_attachments = attachments or []
 
         if RESEND_API_KEY:
             print(f"    Sending via Resend API...", flush=True)
@@ -423,6 +425,14 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
                 "subject": subject,
                 "html": html_body
             }
+            if normalized_attachments:
+                payload["attachments"] = [
+                    {
+                        "filename": item.get("filename", "attachment"),
+                        "content": item.get("content", "")
+                    }
+                    for item in normalized_attachments if item.get("content")
+                ]
             response = requests.post("https://api.resend.com/emails", json=payload, headers=headers, timeout=10)
             if response.status_code in [200, 201]:
                 print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
@@ -451,6 +461,14 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
                 "subject": subject,
                 "htmlContent": html_body
             }
+            if normalized_attachments:
+                payload["attachment"] = [
+                    {
+                        "name": item.get("filename", "attachment"),
+                        "content": item.get("content", "")
+                    }
+                    for item in normalized_attachments if item.get("content")
+                ]
             response = requests.post(BREVO_URL, json=payload, headers=headers, timeout=10)
             if response.status_code in [200, 201, 202]:
                 print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
@@ -469,11 +487,22 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
         if SMTP_PASSWORD:
             print(f"    Sending via SMTP fallback...", flush=True)
             try:
-                message = MIMEMultipart("alternative")
+                message = MIMEMultipart()
                 message["Subject"] = subject
                 message["From"] = BUSINESS_EMAIL
                 message["To"] = recipient
                 message.attach(MIMEText(html_body, "html", "utf-8"))
+
+                for item in normalized_attachments:
+                    content_b64 = item.get("content", "")
+                    if not content_b64:
+                        continue
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(base64.b64decode(content_b64))
+                    encoders.encode_base64(part)
+                    filename = item.get("filename", "attachment")
+                    part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
+                    message.attach(part)
 
                 server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15)
                 if SMTP_USE_TLS:
@@ -499,7 +528,7 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
 
         print(f"    ⚠ WARNING: {last_error}", flush=True)
         if queue_on_fail:
-            queue_email(recipient, subject, html_body, order_id, last_error)
+            queue_email(recipient, subject, html_body, order_id, last_error, normalized_attachments)
         return False, last_error
         
     except Exception as e:
@@ -508,9 +537,40 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
         print(f"    ✗ {last_error}", flush=True)
         traceback.print_exc()
         if queue_on_fail:
-            queue_email(recipient, subject, html_body, order_id, last_error)
+            queue_email(recipient, subject, html_body, order_id, last_error, normalized_attachments)
         sys.stdout.flush()
         return False, last_error
+
+def parse_data_url_attachment(data_url, default_name="qr-photo"):
+    """Convert a data URL to provider-compatible attachment payload."""
+    if not data_url or not isinstance(data_url, str):
+        return None
+    if not data_url.startswith("data:") or "," not in data_url:
+        return None
+
+    header, content = data_url.split(",", 1)
+    if ";base64" not in header or not content:
+        return None
+
+    mime_type = "application/octet-stream"
+    if ":" in header:
+        mime_type = header.split(":", 1)[1].split(";", 1)[0] or mime_type
+
+    extension_map = {
+        "image/png": "png",
+        "image/jpeg": "jpg",
+        "image/jpg": "jpg",
+        "image/webp": "webp",
+        "image/gif": "gif"
+    }
+    extension = extension_map.get(mime_type, "bin")
+    filename = f"{default_name}.{extension}"
+
+    return {
+        "filename": filename,
+        "content": content,
+        "content_type": mime_type
+    }
 
 # ==================== ADMIN ENDPOINTS ====================
 
@@ -591,7 +651,8 @@ def retry_all_queued_emails():
                     email['subject'],
                     email['htmlContent'],
                     email.get('order_id', ''),
-                    queue_on_fail=False
+                    queue_on_fail=False,
+                    attachments=email.get('attachments', [])
                 )
 
                 if delivered:
