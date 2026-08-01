@@ -29,10 +29,13 @@ CORS(app, resources={
 # Configuration - load from environment variables for security
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 
 print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}", flush=True)
 print(f"DEBUG: Resend API key present: {'Yes' if RESEND_API_KEY else 'No - emails will not send'}", flush=True)
-print(f"DEBUG: Using Resend for email delivery", flush=True)
+print(f"DEBUG: Brevo API key present: {'Yes' if BREVO_API_KEY else 'No'}", flush=True)
+print(f"DEBUG: Email provider priority: Resend, then Brevo, then queue", flush=True)
 
 # Admin credentials
 ADMIN_USERNAME = "admin"
@@ -335,49 +338,85 @@ def queue_email(recipient, subject, html_body, order_id=""):
     print(f"    ⏳ Email QUEUED (awaiting provider activation): {recipient}", flush=True)
     sys.stdout.flush()
 
-def send_email(recipient, subject, html_body, order_id=""):
-    """Send email via Resend API"""
+def get_email_provider_status():
+    """Return a human-readable provider status for admin/debug endpoints."""
+    if RESEND_API_KEY:
+        return "Resend API"
+    if BREVO_API_KEY:
+        return "Brevo API"
+    return "Queue only (no provider API key configured)"
+
+def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
+    """Send email via configured provider. Returns True if sent, False otherwise."""
     try:
         print(f"\n  → Sending email to {recipient}...", flush=True)
         print(f"    Subject: {subject}", flush=True)
-        
-        if not RESEND_API_KEY:
-            print(f"    ⚠ WARNING: RESEND_API_KEY not configured", flush=True)
-            queue_email(recipient, subject, html_body, order_id)
-            return
-        
-        print(f"    Sending via Resend API...", flush=True)
-        sys.stdout.flush()
-        
-        headers = {
-            "Authorization": f"Bearer {RESEND_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        
-        payload = {
-            "from": "LEANr Wellness <orders@leanrwellness.com>",
-            "reply_to": BUSINESS_EMAIL,
-            "to": recipient,
-            "subject": subject,
-            "html": html_body
-        }
-        
-        response = requests.post("https://api.resend.com/emails", json=payload, headers=headers, timeout=10)
-        
-        if response.status_code in [200, 201]:
-            print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
-            sys.stdout.flush()
-        else:
+
+        if RESEND_API_KEY:
+            print(f"    Sending via Resend API...", flush=True)
+            headers = {
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "from": "LEANr Wellness <orders@leanrwellness.com>",
+                "reply_to": BUSINESS_EMAIL,
+                "to": [recipient],
+                "subject": subject,
+                "html": html_body
+            }
+            response = requests.post("https://api.resend.com/emails", json=payload, headers=headers, timeout=10)
+            if response.status_code in [200, 201]:
+                print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
+                sys.stdout.flush()
+                return True
+
             print(f"    ✗ Resend API error: {response.status_code} - {response.text}", flush=True)
-            queue_email(recipient, subject, html_body, order_id)
+            if queue_on_fail:
+                queue_email(recipient, subject, html_body, order_id)
             sys.stdout.flush()
+            return False
+
+        if BREVO_API_KEY:
+            print(f"    Sending via Brevo API...", flush=True)
+            headers = {
+                "api-key": BREVO_API_KEY,
+                "Content-Type": "application/json"
+            }
+            payload = {
+                "sender": {
+                    "email": BUSINESS_EMAIL,
+                    "name": "LEANr Wellness"
+                },
+                "to": [{"email": recipient}],
+                "subject": subject,
+                "htmlContent": html_body
+            }
+            response = requests.post(BREVO_URL, json=payload, headers=headers, timeout=10)
+            if response.status_code in [200, 201, 202]:
+                print(f"    ✓ Email sent successfully to {recipient}\n", flush=True)
+                sys.stdout.flush()
+                return True
+
+            print(f"    ✗ Brevo API error: {response.status_code} - {response.text}", flush=True)
+            if queue_on_fail:
+                queue_email(recipient, subject, html_body, order_id)
+            sys.stdout.flush()
+            return False
+
+        print(f"    ⚠ WARNING: No email provider key configured", flush=True)
+        if queue_on_fail:
+            queue_email(recipient, subject, html_body, order_id)
+        return False
         
     except Exception as e:
         import traceback
         print(f"    ✗ Error: {str(e)}", flush=True)
         traceback.print_exc()
-        queue_email(recipient, subject, html_body, order_id)
+        if queue_on_fail:
+            queue_email(recipient, subject, html_body, order_id)
         sys.stdout.flush()
+        return False
 
 # ==================== ADMIN ENDPOINTS ====================
 
@@ -405,7 +444,7 @@ def get_email_queue():
         return jsonify({
             'total': len(queue),
             'queued': queue,
-            'provider_status': 'Gmail SMTP'
+            'provider_status': get_email_provider_status()
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -418,10 +457,12 @@ def get_email_queue_debug():
         return jsonify({
             'status': 'Email Queue Debug',
             'total_queued': len(queue),
+            'resend_api_key_set': bool(RESEND_API_KEY),
             'brevo_api_key_set': bool(BREVO_API_KEY),
+            'provider_status': get_email_provider_status(),
             'business_email': BUSINESS_EMAIL,
             'recent_queued': queue[-5:] if queue else [],  # Last 5 queued
-            'message': 'Emails are queued here waiting for Brevo to activate'
+            'message': 'Emails will be sent via configured provider or queued on failure'
         }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -449,37 +490,21 @@ def retry_all_queued_emails():
         
         for email in queue:
             try:
-                # Try to send
-                response = None
-                if BREVO_API_KEY:
-                    payload = {
-                        "sender": {
-                            "email": BUSINESS_EMAIL,
-                            "name": "LEANr Wellness"
-                        },
-                        "to": [{"email": email['recipient']}],
-                        "subject": email['subject'],
-                        "htmlContent": email['htmlContent']
-                    }
-                    
-                    headers = {
-                        "api-key": BREVO_API_KEY,
-                        "Content-Type": "application/json"
-                    }
-                    
-                    response = requests.post(BREVO_URL, json=payload, headers=headers, timeout=10)
-                    
-                    if response.status_code in [200, 201, 202]:
-                        sent += 1
-                        print(f"✓ Queued email SENT to {email['recipient']}", flush=True)
-                    else:
-                        # Still not ready, keep in queue
-                        still_queued.append(email)
-                        failed += 1
-                        print(f"⚠ Email still queued for {email['recipient']}", flush=True)
+                delivered = send_email(
+                    email['recipient'],
+                    email['subject'],
+                    email['htmlContent'],
+                    email.get('order_id', ''),
+                    queue_on_fail=False
+                )
+
+                if delivered:
+                    sent += 1
+                    print(f"✓ Queued email SENT to {email['recipient']}", flush=True)
                 else:
                     still_queued.append(email)
                     failed += 1
+                    print(f"⚠ Email still queued for {email['recipient']}", flush=True)
             except Exception as e:
                 still_queued.append(email)
                 failed += 1
