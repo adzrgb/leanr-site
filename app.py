@@ -13,6 +13,7 @@ import sys
 import requests
 import smtplib
 import base64
+import shutil
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -62,11 +63,34 @@ ADMIN_PASSWORD_HASH = hashlib.sha256("Qx7m#K2$pL9@vN4b".encode()).hexdigest()
 ADMIN_TOKENS = {}  # Store active tokens
 
 # File paths for data storage
-ORDERS_FILE = "orders.json"
-STOCK_FILE = "stock.json"
-EMAILS_FILE = "newsletter_emails.json"
+DEFAULT_DATA_DIR = "."
+if os.path.exists("/var/data"):
+    DEFAULT_DATA_DIR = "/var/data"
+DATA_DIR = os.getenv("DATA_DIR", DEFAULT_DATA_DIR)
+os.makedirs(DATA_DIR, exist_ok=True)
+
+ORDERS_FILE = os.path.join(DATA_DIR, "orders.json")
+STOCK_FILE = os.path.join(DATA_DIR, "stock.json")
+EMAILS_FILE = os.path.join(DATA_DIR, "newsletter_emails.json")
+EMAIL_QUEUE_FILE = os.path.join(DATA_DIR, "email_queue.json")
+
+print(f"DEBUG: DATA_DIR in use: {DATA_DIR}", flush=True)
+
+def _seed_data_file(file_path, fallback_name):
+    """Initialize data file in persistent dir from fallback project file if available."""
+    if os.path.exists(file_path):
+        return
+    if os.path.exists(fallback_name):
+        try:
+            shutil.copyfile(fallback_name, file_path)
+            print(f"DEBUG: Seeded {file_path} from {fallback_name}", flush=True)
+        except Exception as copy_error:
+            print(f"WARN: Could not seed {file_path}: {copy_error}", flush=True)
 
 # Initialize stock file if it doesn't exist
+if not os.path.exists(STOCK_FILE):
+    _seed_data_file(STOCK_FILE, "stock.json")
+
 if not os.path.exists(STOCK_FILE):
     default_stock = {
         "RETATRUTIDE": [
@@ -90,6 +114,10 @@ if not os.path.exists(STOCK_FILE):
     }
     with open(STOCK_FILE, 'w') as f:
         json.dump(default_stock, f)
+
+_seed_data_file(ORDERS_FILE, "orders.json")
+_seed_data_file(EMAILS_FILE, "newsletter_emails.json")
+_seed_data_file(EMAIL_QUEUE_FILE, "email_queue.json")
 
 @app.route('/api/send-order', methods=['POST', 'OPTIONS'])
 def send_order():
@@ -357,8 +385,6 @@ def send_order_emails(data, items_html):
         import traceback
         print(traceback.format_exc(), flush=True)
         sys.stdout.flush()
-
-EMAIL_QUEUE_FILE = "email_queue.json"
 
 def load_email_queue():
     """Load email queue from file"""
