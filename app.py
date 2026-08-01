@@ -140,6 +140,8 @@ def send_order():
             'city': data['city'],
             'postcode': data['postcode'],
             'orderNotes': data.get('orderNotes', ''),
+            'useRoyalMailQr': data.get('useRoyalMailQr', False),
+            'royalMailQrCode': data.get('royalMailQrCode', ''),
             'items': data['items'],
             'subtotal': data['subtotal'],
             'discountAmount': data.get('discountAmount', 0),
@@ -222,6 +224,13 @@ def send_order_emails(data, items_html):
                         <h3>Delivery Address</h3>
                         <p>{data['deliveryAddress']}<br>{data['city']}<br>{data['postcode']}</p>
                     </div>
+
+                    {f'''<div class="order-details">
+                        <h3>Royal Mail QR</h3>
+                        <p><strong>Customer selected Royal Mail QR option:</strong> Yes</p>
+                        <p><strong>QR Code / Reference:</strong><br>{data.get('royalMailQrCode', '').replace('<', '&lt;').replace('>', '&gt;')}</p>
+                        <p><strong>Link:</strong> https://send.royalmail.com/ (Small Parcel)</p>
+                    </div>''' if data.get('useRoyalMailQr') else ''}
                     
                     <h3>Order Items</h3>
                     <table>
@@ -284,6 +293,11 @@ def send_order_emails(data, items_html):
                         <p><strong>Option 1: PayPal</strong><br>leanrwellness@gmail.com</p>
                         <p><strong>Option 2: Bank Transfer</strong><br>Sort: 23-01-20 | Account: 13050648<br>Reference: {data['orderNumber'][-4:]}<br><em>Please use the name A W when making the transfer. Don't worry if the name does not match your bank — this is normal.</em></p>
                     </div>
+                    {f'''<div class="order-details">
+                        <h3>Royal Mail QR (Under £100 Orders)</h3>
+                        <p>You selected Royal Mail QR postage. Please use <strong>Small Parcel</strong> on <a href="https://send.royalmail.com/">send.royalmail.com</a>.</p>
+                        <p><strong>Your QR Code / Reference:</strong><br>{data.get('royalMailQrCode', '').replace('<', '&lt;').replace('>', '&gt;')}</p>
+                    </div>''' if data.get('useRoyalMailQr') else ''}
                 </div>
             </body>
         </html>

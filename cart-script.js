@@ -107,6 +107,7 @@ function renderCart() {
   document.getElementById('subtotal').textContent = `£${subtotal.toFixed(2)}`;
   document.getElementById('delivery').textContent = postage === 0 ? 'FREE' : `£${postage.toFixed(2)}`;
   document.getElementById('total').textContent = `£${total.toFixed(2)}`;
+  updateRoyalMailQrSection(subtotal);
   
   // Add remove listeners
   document.querySelectorAll('.remove-btn').forEach(btn => {
@@ -118,6 +119,22 @@ function renderCart() {
       renderCart();
     });
   });
+}
+
+function updateRoyalMailQrSection(subtotal) {
+  const wrapper = document.getElementById('royalmail-qr-wrapper');
+  const checkbox = document.getElementById('use-royalmail-qr');
+  const input = document.getElementById('royalmail-qr-code');
+
+  if (!wrapper || !checkbox || !input) return;
+
+  const needsRoyalMailOption = subtotal < 100;
+  wrapper.style.display = needsRoyalMailOption ? 'block' : 'none';
+
+  if (!needsRoyalMailOption) {
+    checkbox.checked = false;
+    input.value = '';
+  }
 }
 
 // Handle checkout form submission
@@ -142,6 +159,13 @@ if (checkoutForm) {
     // Calculate postage (£5 for orders under £100, free over £100)
     const postage = subtotal < 100 ? 5 : 0;
     const total = subtotal - discountAmount + postage;
+    const useRoyalMailQr = subtotal < 100 && !!document.getElementById('use-royalmail-qr')?.checked;
+    const royalMailQrCode = subtotal < 100 ? (document.getElementById('royalmail-qr-code')?.value || '').trim() : '';
+
+    if (useRoyalMailQr && !royalMailQrCode) {
+      alert('Please add your Royal Mail QR code/reference, or untick the Royal Mail QR option.');
+      return;
+    }
     
     const orderData = {
       orderNumber: 'ORD-' + Date.now() + '-' + Math.floor(Math.random() * 10000),
@@ -152,6 +176,8 @@ if (checkoutForm) {
       postcode: document.getElementById('postcode').value,
       city: document.getElementById('city').value,
       orderNotes: document.getElementById('order-notes').value || '',
+      useRoyalMailQr: useRoyalMailQr,
+      royalMailQrCode: royalMailQrCode,
       items: cart,
       subtotal: subtotal,
       discountAmount: discountAmount,
