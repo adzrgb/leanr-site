@@ -245,6 +245,73 @@ _seed_data_file(ORDERS_FILE, "orders.json")
 _seed_data_file(EMAILS_FILE, "newsletter_emails.json")
 _seed_data_file(EMAIL_QUEUE_FILE, "email_queue.json")
 
+def _extract_variant_name(option_value):
+    """Normalize cart option text to a stock variant name."""
+    if not option_value:
+        return "default"
+    # Frontend stores options like "20mg — £89"; we only need the variant label.
+    return str(option_value).split(" — ")[0].strip() or "default"
+
+def decrement_stock_for_order_items(items):
+    """Reduce stock for each ordered item. Returns (ok, error_message)."""
+    stock_data = load_stock_data()
+    decrements = {}
+
+    for item in items or []:
+        product_name = str(item.get('name', '')).strip()
+        if not product_name:
+            return False, "Order item is missing product name"
+
+        try:
+            quantity = int(item.get('quantity', 0))
+        except (TypeError, ValueError):
+            return False, f"Invalid quantity for {product_name}"
+
+        if quantity <= 0:
+            return False, f"Quantity must be greater than 0 for {product_name}"
+
+        variant_name = _extract_variant_name(item.get('option'))
+        key = f"{product_name}|{variant_name}"
+        decrements[key] = decrements.get(key, 0) + quantity
+
+    # Validate availability first so we never partially decrement stock.
+    for key, quantity in decrements.items():
+        product_name, variant_name = key.split('|', 1)
+        product_stock = stock_data.get(product_name)
+
+        if product_stock is None:
+            return False, f"Product not found in stock: {product_name}"
+
+        if variant_name == 'default':
+            if not isinstance(product_stock, dict):
+                return False, f"Stock variant required for {product_name}"
+            current_stock = int(product_stock.get('stock', 0))
+            if current_stock < quantity:
+                return False, f"Not enough stock for {product_name}"
+        else:
+            if not isinstance(product_stock, list):
+                return False, f"Invalid stock format for {product_name}"
+            variant_obj = next((v for v in product_stock if v.get('name') == variant_name), None)
+            if not variant_obj:
+                return False, f"Variant not found: {product_name} {variant_name}"
+            current_stock = int(variant_obj.get('stock', 0))
+            if current_stock < quantity:
+                return False, f"Not enough stock for {product_name} {variant_name}"
+
+    # Apply decrements after all validations pass.
+    for key, quantity in decrements.items():
+        product_name, variant_name = key.split('|', 1)
+        product_stock = stock_data[product_name]
+
+        if variant_name == 'default':
+            product_stock['stock'] = int(product_stock.get('stock', 0)) - quantity
+        else:
+            variant_obj = next((v for v in product_stock if v.get('name') == variant_name), None)
+            variant_obj['stock'] = int(variant_obj.get('stock', 0)) - quantity
+
+    save_stock_data(stock_data)
+    return True, ""
+
 @app.route('/api/send-order', methods=['POST', 'OPTIONS'])
 def send_order():
     # Handle CORS preflight
@@ -281,6 +348,11 @@ def send_order():
                 <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">£{item['price'] * item['quantity']:.2f}</td>
             </tr>
             """
+
+        # Decrement stock for this purchase before persisting the order.
+        stock_ok, stock_error = decrement_stock_for_order_items(data.get('items', []))
+        if not stock_ok:
+            return jsonify({'success': False, 'error': stock_error}), 400
         
         # Save order FIRST
         orders = load_orders_data()
