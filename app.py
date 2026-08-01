@@ -33,6 +33,7 @@ CORS(app, resources={
 BUSINESS_EMAIL = os.getenv("BUSINESS_EMAIL", "leanrwellness@gmail.com")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
+BREVO_ENABLED = os.getenv("BREVO_ENABLED", "true").lower() == "true"
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "LEANr Wellness <onboarding@resend.dev>")
 BREVO_SENDER_EMAIL = os.getenv("BREVO_SENDER_EMAIL", BUSINESS_EMAIL)
@@ -46,6 +47,7 @@ SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
 print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}", flush=True)
 print(f"DEBUG: Resend API key present: {'Yes' if RESEND_API_KEY else 'No - emails will not send'}", flush=True)
 print(f"DEBUG: Brevo API key present: {'Yes' if BREVO_API_KEY else 'No'}", flush=True)
+print(f"DEBUG: Brevo enabled: {'Yes' if BREVO_ENABLED else 'No'}", flush=True)
 print(f"DEBUG: Resend from: {RESEND_FROM_EMAIL}", flush=True)
 print(f"DEBUG: Brevo sender: {BREVO_SENDER_NAME} <{BREVO_SENDER_EMAIL}>", flush=True)
 print(f"DEBUG: SMTP fallback configured: {'Yes' if SMTP_PASSWORD else 'No'}", flush=True)
@@ -367,7 +369,7 @@ def get_email_provider_status():
     """Return a human-readable provider status for admin/debug endpoints."""
     if RESEND_API_KEY:
         return "Resend API"
-    if BREVO_API_KEY:
+    if BREVO_API_KEY and BREVO_ENABLED:
         return "Brevo API"
     if SMTP_PASSWORD:
         return "SMTP"
@@ -378,7 +380,7 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
     try:
         print(f"\n  → Sending email to {recipient}...", flush=True)
         print(f"    Subject: {subject}", flush=True)
-        last_error = ""
+        attempt_errors = []
 
         if RESEND_API_KEY:
             print(f"    Sending via Resend API...", flush=True)
@@ -399,11 +401,14 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
                 sys.stdout.flush()
                 return True, ""
 
-            last_error = f"Resend API error: {response.status_code} - {response.text}"
-            print(f"    ✗ {last_error}", flush=True)
+            resend_error = f"Resend API error: {response.status_code} - {response.text}"
+            attempt_errors.append(resend_error)
+            print(f"    ✗ {resend_error}", flush=True)
             sys.stdout.flush()
+        else:
+            attempt_errors.append("Resend skipped: missing API key")
 
-        if BREVO_API_KEY:
+        if BREVO_API_KEY and BREVO_ENABLED:
             print(f"    Sending via Brevo API...", flush=True)
             headers = {
                 "api-key": BREVO_API_KEY,
@@ -424,9 +429,14 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
                 sys.stdout.flush()
                 return True, ""
 
-            last_error = f"Brevo API error: {response.status_code} - {response.text}"
-            print(f"    ✗ {last_error}", flush=True)
+            brevo_error = f"Brevo API error: {response.status_code} - {response.text}"
+            attempt_errors.append(brevo_error)
+            print(f"    ✗ {brevo_error}", flush=True)
             sys.stdout.flush()
+        elif BREVO_API_KEY and not BREVO_ENABLED:
+            attempt_errors.append("Brevo skipped: BREVO_ENABLED=false")
+        else:
+            attempt_errors.append("Brevo skipped: missing API key")
 
         if SMTP_PASSWORD:
             print(f"    Sending via SMTP fallback...", flush=True)
@@ -448,12 +458,16 @@ def send_email(recipient, subject, html_body, order_id="", queue_on_fail=True):
                 sys.stdout.flush()
                 return True, ""
             except Exception as smtp_error:
-                last_error = f"SMTP error: {str(smtp_error)}"
-                print(f"    ✗ {last_error}", flush=True)
+                smtp_error_msg = f"SMTP error: {str(smtp_error)}"
+                attempt_errors.append(smtp_error_msg)
+                print(f"    ✗ {smtp_error_msg}", flush=True)
                 sys.stdout.flush()
+        else:
+            attempt_errors.append("SMTP skipped: missing password")
 
-        if not RESEND_API_KEY and not BREVO_API_KEY and not SMTP_PASSWORD:
-            last_error = "No email provider key configured"
+        last_error = " | ".join(attempt_errors)
+        if not last_error:
+            last_error = "No delivery attempt was made"
 
         print(f"    ⚠ WARNING: {last_error}", flush=True)
         if queue_on_fail:
@@ -511,6 +525,8 @@ def get_email_queue_debug():
             'total_queued': len(queue),
             'resend_api_key_set': bool(RESEND_API_KEY),
             'brevo_api_key_set': bool(BREVO_API_KEY),
+            'brevo_enabled': BREVO_ENABLED,
+            'smtp_password_set': bool(SMTP_PASSWORD),
             'provider_status': get_email_provider_status(),
             'business_email': BUSINESS_EMAIL,
             'recent_queued': queue[-5:] if queue else [],  # Last 5 queued
