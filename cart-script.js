@@ -51,6 +51,17 @@ function addToCart(product) {
   updateCartCount();
 }
 
+function shouldUseRoyalMailQr(subtotal) {
+  if (subtotal >= 100) return false;
+  const checkbox = document.getElementById('use-royalmail-qr');
+  return !!checkbox?.checked;
+}
+
+function calculatePostage(subtotal) {
+  if (subtotal >= 100) return 0;
+  return shouldUseRoyalMailQr(subtotal) ? 0 : 5;
+}
+
 function renderCart() {
   const cartEmpty = document.getElementById('cart-empty');
   const cartItems = document.getElementById('cart-items');
@@ -90,8 +101,8 @@ function renderCart() {
     discountAmount = subtotal * (DISCOUNT_PERCENT / 100);
   }
   
-  // Calculate postage (£5 for orders under £100, free over £100)
-  const postage = subtotal < 100 ? 5 : 0;
+  // Calculate postage (£5 under £100, but waived when Royal Mail QR option is selected)
+  const postage = calculatePostage(subtotal);
   const total = subtotal - discountAmount + postage;
   
   
@@ -167,10 +178,10 @@ if (checkoutForm) {
       discountAmount = subtotal * (DISCOUNT_PERCENT / 100);
     }
     
-    // Calculate postage (£5 for orders under £100, free over £100)
-    const postage = subtotal < 100 ? 5 : 0;
+    const useRoyalMailQr = shouldUseRoyalMailQr(subtotal);
+    // Calculate postage (£5 under £100, but waived when Royal Mail QR option is selected)
+    const postage = calculatePostage(subtotal);
     const total = subtotal - discountAmount + postage;
-    const useRoyalMailQr = subtotal < 100 && !!document.getElementById('use-royalmail-qr')?.checked;
     const royalMailQrCode = subtotal < 100 ? (document.getElementById('royalmail-qr-code')?.value || '').trim() : '';
     const royalMailQrPhotoFile = subtotal < 100 ? document.getElementById('royalmail-qr-photo')?.files?.[0] : null;
 
@@ -245,6 +256,13 @@ if (checkoutForm) {
       console.error('Error:', error);
       alert('Unable to process order: ' + error.message);
     }
+  });
+}
+
+const royalMailCheckbox = document.getElementById('use-royalmail-qr');
+if (royalMailCheckbox) {
+  royalMailCheckbox.addEventListener('change', () => {
+    renderCart();
   });
 }
 
