@@ -740,9 +740,14 @@ def send_tracking():
         if not verify_token(token):
             return jsonify({'error': 'Invalid token'}), 401
         
-        data = request.json
+        data = request.json or {}
         order_number = data.get('orderNumber')
-        tracking_number = data.get('trackingNumber')
+        tracking_number = (data.get('trackingNumber') or '').strip()
+
+        if not order_number:
+            return jsonify({'error': 'Order number is required'}), 400
+        if not tracking_number:
+            return jsonify({'error': 'Tracking number is required'}), 400
         
         # Find order and update
         orders = []
@@ -791,13 +796,23 @@ def send_tracking():
         </html>
         """
         
-        send_email(
-            order['customerEmail'],
+        customer_email = order.get('customerEmail') or order.get('email')
+        if not customer_email:
+            return jsonify({'error': 'Customer email not found for this order'}), 400
+
+        sent, send_error = send_email(
+            customer_email,
             f"Your Order {order_number} is on the Way! - Tracking: {tracking_number}",
             tracking_email_body,
             order_number
         )
-        
+
+        if not sent:
+            return jsonify({
+                'error': 'Tracking email could not be delivered immediately',
+                'details': send_error
+            }), 502
+
         print(f"✓ Tracking email sent for order {order_number}")
         return jsonify({'success': True, 'message': 'Tracking number sent to customer'}), 200
     except Exception as e:
