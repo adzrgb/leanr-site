@@ -523,7 +523,7 @@ def send_order_emails(data, items_html):
                     </div>
                     <div class="payment-section">
                         <h3>Payment Information</h3>
-                        <p><strong>Option 1: PayPal</strong><br>leanrwellness@gmail.com</p>
+                        <p><strong>Option 1: PayPal</strong><br>ellaclegg232@gmail.com</p>
                         <p><strong>Option 2: Bank Transfer</strong><br>Sort: 23-01-20 | Account: 13050648<br>Reference: {data['orderNumber'][-4:]}<br><em>Please use the name A W when making the transfer. Don't worry if the name does not match your bank — this is normal.</em></p>
                     </div>
                     {f'''<div class="order-details">
