@@ -29,6 +29,16 @@
       "stock": 1
     }
   ],
+  "MT2": [
+    {
+      "name": "Nasal",
+      "stock": 50
+    },
+    {
+      "name": "Pen",
+      "stock": 50
+    }
+  ],
   "GHK-CU": [
     {
       "name": "Vial",

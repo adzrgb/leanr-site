@@ -223,6 +223,10 @@ default_stock = {
         {"name": "Vial", "stock": 50},
         {"name": "Pen", "stock": 50}
     ],
+    "MT2": [
+        {"name": "Nasal", "stock": 50},
+        {"name": "Pen", "stock": 50}
+    ],
     "GHK-CU": [
         {"name": "Vial", "stock": 50},
         {"name": "Pen", "stock": 50}
@@ -241,6 +245,30 @@ if not os.path.exists(STOCK_FILE):
 if not load_stock_data():
     save_stock_data(default_stock)
 
+# Ensure new products/variants are added to existing stock files without
+# overwriting current quantities for already configured items.
+current_stock = load_stock_data()
+stock_changed = False
+
+# MT2 variant update: migrate legacy "Vial" stock to "Nasal".
+if isinstance(current_stock.get("MT2"), list):
+    mt2_variants = current_stock["MT2"]
+    has_nasal = any(v.get("name") == "Nasal" for v in mt2_variants)
+    if not has_nasal:
+        for variant in mt2_variants:
+            if variant.get("name") == "Vial":
+                variant["name"] = "Nasal"
+                stock_changed = True
+                break
+
+for product_name, default_value in default_stock.items():
+    if product_name not in current_stock:
+        current_stock[product_name] = default_value
+        stock_changed = True
+
+if stock_changed:
+    save_stock_data(current_stock)
+
 _seed_data_file(ORDERS_FILE, "orders.json")
 _seed_data_file(EMAILS_FILE, "newsletter_emails.json")
 _seed_data_file(EMAIL_QUEUE_FILE, "email_queue.json")
@@ -251,6 +279,33 @@ def _extract_variant_name(option_value):
         return "default"
     # Frontend stores options like "20mg — £89"; we only need the variant label.
     return str(option_value).split(" — ")[0].strip() or "default"
+
+BUNDLE_PRODUCT_NAME = "MULTI BUY BUNDLE"
+BUNDLE_COMPONENTS = [
+    ("GHK-CU", "Pen"),
+    ("MT2", "Nasal"),
+    ("MT2", "Pen")
+]
+
+def _get_variant_stock(stock_data, product_name, variant_name):
+    """Return stock integer for a product variant, or None if missing."""
+    product_stock = stock_data.get(product_name)
+    if not isinstance(product_stock, list):
+        return None
+    variant_obj = next((v for v in product_stock if v.get('name') == variant_name), None)
+    if not variant_obj:
+        return None
+    return int(variant_obj.get('stock', 0))
+
+def _calculate_bundle_stock(stock_data):
+    """Bundle availability equals the lowest stock among required components."""
+    component_levels = []
+    for product_name, variant_name in BUNDLE_COMPONENTS:
+        variant_stock = _get_variant_stock(stock_data, product_name, variant_name)
+        if variant_stock is None:
+            return 0
+        component_levels.append(variant_stock)
+    return min(component_levels) if component_levels else 0
 
 def decrement_stock_for_order_items(items):
     """Reduce stock for each ordered item. Returns (ok, error_message)."""
@@ -269,6 +324,12 @@ def decrement_stock_for_order_items(items):
 
         if quantity <= 0:
             return False, f"Quantity must be greater than 0 for {product_name}"
+
+        if product_name == BUNDLE_PRODUCT_NAME:
+            for bundle_product, bundle_variant in BUNDLE_COMPONENTS:
+                key = f"{bundle_product}|{bundle_variant}"
+                decrements[key] = decrements.get(key, 0) + quantity
+            continue
 
         variant_name = _extract_variant_name(item.get('option'))
         key = f"{product_name}|{variant_name}"
@@ -1390,6 +1451,12 @@ def get_public_stock():
                     'name': product_name,
                     'stock': product_info.get('stock', 0)
                 })
+
+        # Virtual bundle stock is derived from component availability.
+        stock_list.append({
+            'name': BUNDLE_PRODUCT_NAME,
+            'stock': _calculate_bundle_stock(stock_data)
+        })
         
         return jsonify({'stock': stock_list}), 200
     except Exception as e:

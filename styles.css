@@ -825,6 +825,37 @@ blockquote footer {
   margin-bottom: 1.2rem;
 }
 
+.people-also-buy {
+  background: linear-gradient(135deg, rgba(224, 242, 254, 0.5), rgba(252, 228, 236, 0.5));
+  border: 1px solid rgba(0, 82, 204, 0.15);
+  border-radius: 0.8rem;
+  padding: 0.9rem;
+  margin-bottom: 1rem;
+}
+.people-also-buy h4 {
+  margin: 0 0 0.6rem;
+  color: var(--primary-blue);
+}
+.people-also-buy-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+.people-buy-btn {
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--primary-blue), var(--accent-pink));
+  color: white;
+  padding: 0.45rem 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.people-buy-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
 .form-group label {
   display: block;
   margin-bottom: 0.5rem;

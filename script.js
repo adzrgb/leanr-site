@@ -180,6 +180,8 @@ function updateProductBadges(stockData) {
               updateVariantStockInfo('TIRZEPETIDE', 'tirze-stock-info', variantName);
             } else if (productName === 'MT1') {
               updateVariantStockInfo('MT1', 'mt1-stock-info', variantName);
+            } else if (productName === 'MT2') {
+              updateVariantStockInfo('MT2', 'mt2-stock-info', variantName);
             } else if (productName === 'GHK-CU') {
               updateVariantStockInfo('GHK-CU', 'ghk-stock-info', variantName);
             }
@@ -373,6 +375,26 @@ if (mt1Select && mt1Price) {
       addButton.dataset.option = selectedText;
       updateButtonForVariant('MT1', selectedText, addButton);
       updateVariantStockInfo('MT1', 'mt1-stock-info', variantName);
+    }
+  });
+}
+
+// Handle MT2 format selector
+const mt2Select = document.getElementById('mt2-select');
+const mt2Price = document.getElementById('mt2-price');
+
+if (mt2Select && mt2Price) {
+  mt2Select.addEventListener('change', (event) => {
+    const selectedValue = event.target.value;
+    const selectedText = event.target.options[event.target.selectedIndex].text;
+    const variantName = selectedText.split(' — ')[0].trim();
+    mt2Price.textContent = `£${selectedValue}`;
+    const addButton = document.querySelector('[data-modal="modal-mt2"] .add-btn');
+    if (addButton) {
+      addButton.dataset.price = selectedValue;
+      addButton.dataset.option = selectedText;
+      updateButtonForVariant('MT2', selectedText, addButton);
+      updateVariantStockInfo('MT2', 'mt2-stock-info', variantName);
     }
   });
 }

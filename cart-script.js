@@ -51,6 +51,28 @@ function addToCart(product) {
   updateCartCount();
 }
 
+function initCheckoutUpsell() {
+  const upsellButton = document.getElementById('add-ghkcu-upsell-btn');
+  if (!upsellButton) return;
+
+  upsellButton.addEventListener('click', () => {
+    addToCart({
+      name: 'GHK-CU',
+      price: 45,
+      option: 'Pen — £45'
+    });
+
+    renderCart();
+    upsellButton.textContent = 'Added';
+    upsellButton.disabled = true;
+
+    setTimeout(() => {
+      upsellButton.textContent = 'Add to cart';
+      upsellButton.disabled = false;
+    }, 1200);
+  });
+}
+
 function shouldUseRoyalMailQr(subtotal) {
   if (subtotal >= 100) return false;
   const checkbox = document.getElementById('use-royalmail-qr');
@@ -291,6 +313,7 @@ document.querySelector('.signup-form')?.addEventListener('submit', (event) => {
 // Initialize
 updateCartCount();
 renderCart();
+initCheckoutUpsell();
 
 // Setup discount code handler - INLINE to ensure it runs
 document.addEventListener('DOMContentLoaded', function() {
