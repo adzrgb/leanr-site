@@ -699,7 +699,19 @@
         grid.innerHTML = data.stock.map(product => `
           <div class="stock-card">
             <h3>${product.name}</h3>
-            ${product.variants ? product.variants.map(variant => `
+            ${product.isVirtual ? `
+              <div class="stock-form-group">
+                <label>Calculated Bundle Stock</label>
+                <input 
+                  type="number" 
+                  min="0" 
+                  value="${product.stock}"
+                  data-product="${product.name}"
+                  data-variant="default"
+                  disabled>
+                <small style="color: #64748b;">Auto-calculated from GHK-CU Pen, MT2 Nasal, and MT2 Pen stock.</small>
+              </div>
+            ` : product.variants ? product.variants.map(variant => `
               <div class="stock-form-group">
                 <label>${variant.name}</label>
                 <input 

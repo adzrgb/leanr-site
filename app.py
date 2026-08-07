@@ -1359,6 +1359,13 @@ def get_stock():
                     'name': product_name,
                     'stock': product_data.get('stock', 0)
                 })
+
+        # Virtual bundle stock is derived from component availability.
+        stock_list.append({
+            'name': BUNDLE_PRODUCT_NAME,
+            'stock': _calculate_bundle_stock(stock_data),
+            'isVirtual': True
+        })
         
         return jsonify({'stock': stock_list}), 200
     except Exception as e:
@@ -1396,6 +1403,9 @@ def update_stock():
 
         if new_stock < 0:
             return jsonify({'error': 'Stock cannot be negative'}), 400
+
+        if product_name == BUNDLE_PRODUCT_NAME:
+            return jsonify({'error': 'Bundle stock is calculated automatically'}), 400
         
         stock_data = load_stock_data()
         
