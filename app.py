@@ -87,11 +87,19 @@ ORDERS_FILE = os.path.join(DATA_DIR, "orders.json")
 STOCK_FILE = os.path.join(DATA_DIR, "stock.json")
 EMAILS_FILE = os.path.join(DATA_DIR, "newsletter_emails.json")
 EMAIL_QUEUE_FILE = os.path.join(DATA_DIR, "email_queue.json")
+DISCOUNT_SETTINGS_FILE = os.path.join(DATA_DIR, "discount_settings.json")
 
 ORDERS_KEY = "orders"
 STOCK_KEY = "stock"
 EMAILS_KEY = "newsletter_emails"
 EMAIL_QUEUE_KEY = "email_queue"
+DISCOUNT_SETTINGS_KEY = "discount_settings"
+
+DEFAULT_DISCOUNT_SETTINGS = {
+    "enabled": True,
+    "code": "LEANR10",
+    "percent": 10
+}
 
 print(f"DEBUG: DATA_DIR in use: {DATA_DIR}", flush=True)
 
@@ -209,6 +217,41 @@ def load_email_queue_data():
 def save_email_queue_data(queue):
     save_state(EMAIL_QUEUE_KEY, EMAIL_QUEUE_FILE, queue)
 
+def load_discount_settings_data():
+    return load_state(DISCOUNT_SETTINGS_KEY, DISCOUNT_SETTINGS_FILE, DEFAULT_DISCOUNT_SETTINGS)
+
+def save_discount_settings_data(settings):
+    save_state(DISCOUNT_SETTINGS_KEY, DISCOUNT_SETTINGS_FILE, settings)
+
+def get_discount_settings():
+    """Return validated discount settings with safe defaults."""
+    raw = load_discount_settings_data()
+    if not isinstance(raw, dict):
+        raw = {}
+
+    enabled = bool(raw.get('enabled', DEFAULT_DISCOUNT_SETTINGS['enabled']))
+    code = str(raw.get('code', DEFAULT_DISCOUNT_SETTINGS['code'])).strip().upper() or DEFAULT_DISCOUNT_SETTINGS['code']
+
+    try:
+        percent = int(raw.get('percent', DEFAULT_DISCOUNT_SETTINGS['percent']))
+    except (TypeError, ValueError):
+        percent = DEFAULT_DISCOUNT_SETTINGS['percent']
+
+    if percent < 0:
+        percent = 0
+
+    return {
+        'enabled': enabled,
+        'code': code,
+        'percent': percent
+    }
+
+def set_discount_enabled(enabled):
+    settings = get_discount_settings()
+    settings['enabled'] = bool(enabled)
+    save_discount_settings_data(settings)
+    return settings
+
 # Initialize stock file if it doesn't exist
 default_stock = {
     "RETATRUTIDE": [
@@ -268,6 +311,9 @@ for product_name, default_value in default_stock.items():
 
 if stock_changed:
     save_stock_data(current_stock)
+
+if not load_discount_settings_data():
+    save_discount_settings_data(DEFAULT_DISCOUNT_SETTINGS)
 
 _seed_data_file(ORDERS_FILE, "orders.json")
 _seed_data_file(EMAILS_FILE, "newsletter_emails.json")
@@ -393,6 +439,34 @@ def send_order():
         # Generate timestamp if not provided
         if 'timestamp' not in data or not data['timestamp']:
             data['timestamp'] = datetime.now().isoformat()
+
+        # Enforce discount rules on the server so disabled discounts cannot be
+        # applied by stale clients.
+        discount_settings = get_discount_settings()
+        submitted_code = str(data.get('discountCode') or '').strip().upper()
+        submitted_discount = data.get('discountAmount', 0)
+
+        try:
+            submitted_discount = float(submitted_discount)
+        except (TypeError, ValueError):
+            submitted_discount = 0
+
+        if (not discount_settings['enabled']) or (submitted_code != discount_settings['code']):
+            submitted_discount = 0
+            submitted_code = None
+
+        subtotal_value = float(data.get('subtotal', 0) or 0)
+        postage_value = float(data.get('postage', 0) or 0)
+        max_allowed_discount = subtotal_value * (discount_settings['percent'] / 100)
+
+        if submitted_discount < 0:
+            submitted_discount = 0
+        if submitted_discount > max_allowed_discount:
+            submitted_discount = max_allowed_discount
+
+        data['discountAmount'] = round(submitted_discount, 2)
+        data['discountCode'] = submitted_code
+        data['total'] = round(subtotal_value - data['discountAmount'] + postage_value, 2)
         
         print(f"Order Number: {data.get('orderNumber')}")
         print(f"Customer: {data.get('customerName')}")
@@ -1471,6 +1545,43 @@ def get_public_stock():
         return jsonify({'stock': stock_list}), 200
     except Exception as e:
         print(f"ERROR fetching stock: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/public/discount-settings', methods=['GET'])
+def get_public_discount_settings():
+    """Public discount settings used by checkout and site popup."""
+    try:
+        settings = get_discount_settings()
+        return jsonify({'discount': settings}), 200
+    except Exception as e:
+        print(f"ERROR fetching discount settings: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/discount-settings', methods=['GET', 'POST', 'OPTIONS'])
+def admin_discount_settings():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        token = auth_header.replace('Bearer ', '')
+        if not verify_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+
+        if request.method == 'GET':
+            return jsonify({'discount': get_discount_settings()}), 200
+
+        data = request.json or {}
+        if 'enabled' not in data:
+            return jsonify({'error': 'Missing enabled field'}), 400
+
+        settings = set_discount_enabled(bool(data.get('enabled')))
+        return jsonify({'success': True, 'discount': settings}), 200
+    except Exception as e:
+        print(f"ERROR updating discount settings: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # Newsletter email endpoint

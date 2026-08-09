@@ -40,15 +40,44 @@ function initCookieConsent() {
 function initDiscountPopup() {
   const popup = document.getElementById('discount-popup');
   const popupClose = document.getElementById('popup-close');
+  const codeDisplay = document.querySelector('.discount-code-display');
+  const popupText = document.querySelector('.popup-text');
   
   if (popup && popupClose) {
-    // Check if popup was previously dismissed
-    if (!localStorage.getItem('discount-popup-dismissed')) {
-      // Show popup after 1 second
-      setTimeout(() => {
-        popup.classList.add('active');
-      }, 1000);
-    }
+    fetch(window.location.origin + '/api/public/discount-settings')
+      .then(res => res.json())
+      .then(data => {
+        const discount = data.discount || {};
+        if (!discount.enabled) {
+          popup.classList.remove('active');
+          popup.style.display = 'none';
+          return;
+        }
+
+        if (codeDisplay && discount.code) {
+          codeDisplay.textContent = discount.code;
+        }
+
+        if (popupText && Number.isFinite(Number(discount.percent))) {
+          popupText.innerHTML = `Get <strong>${discount.percent}% OFF</strong> all orders on LEANr`;
+        }
+
+        // Check if popup was previously dismissed
+        if (!localStorage.getItem('discount-popup-dismissed')) {
+          // Show popup after 1 second
+          setTimeout(() => {
+            popup.classList.add('active');
+          }, 1000);
+        }
+      })
+      .catch(() => {
+        // Fallback: keep current popup behavior if settings request fails.
+        if (!localStorage.getItem('discount-popup-dismissed')) {
+          setTimeout(() => {
+            popup.classList.add('active');
+          }, 1000);
+        }
+      });
     
     // Close popup on button click
     popupClose.addEventListener('click', () => {

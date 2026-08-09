@@ -1,8 +1,11 @@
 // Initialize cart from localStorage
 const cart = JSON.parse(localStorage.getItem('leanr-cart')) || [];
 let discountApplied = false;
-const DISCOUNT_CODE = 'LEANR10';
-const DISCOUNT_PERCENT = 10;
+let discountConfig = {
+  enabled: true,
+  code: 'LEANR10',
+  percent: 10
+};
 
 const cartCount = document.getElementById('cart-count');
 
@@ -49,6 +52,40 @@ function addToCart(product) {
   
   saveCart();
   updateCartCount();
+}
+
+function applyDiscountUiState() {
+  const discountSection = document.querySelector('.discount-section');
+  const discountRow = document.getElementById('discount-row');
+  const discountMessage = document.getElementById('discount-message');
+
+  if (!discountConfig.enabled) {
+    discountApplied = false;
+    if (discountSection) discountSection.style.display = 'none';
+    if (discountRow) discountRow.style.display = 'none';
+    if (discountMessage) discountMessage.textContent = '';
+    return;
+  }
+
+  if (discountSection) discountSection.style.display = 'block';
+}
+
+function initDiscountSettings() {
+  return fetch(window.location.origin + '/api/public/discount-settings')
+    .then(res => res.json())
+    .then(data => {
+      const discount = data.discount || {};
+      discountConfig = {
+        enabled: !!discount.enabled,
+        code: (discount.code || 'LEANR10').toString().trim().toUpperCase(),
+        percent: Number.isFinite(Number(discount.percent)) ? Number(discount.percent) : 10
+      };
+      applyDiscountUiState();
+      renderCart();
+    })
+    .catch(() => {
+      applyDiscountUiState();
+    });
 }
 
 function initCheckoutUpsell() {
@@ -119,8 +156,8 @@ function renderCart() {
   
   // Calculate discount if applied
   let discountAmount = 0;
-  if (discountApplied) {
-    discountAmount = subtotal * (DISCOUNT_PERCENT / 100);
+  if (discountApplied && discountConfig.enabled) {
+    discountAmount = subtotal * (discountConfig.percent / 100);
   }
   
   // Calculate postage (£5 under £100, but waived when Royal Mail QR option is selected)
@@ -196,8 +233,8 @@ if (checkoutForm) {
     
     // Calculate discount if applied
     let discountAmount = 0;
-    if (discountApplied) {
-      discountAmount = subtotal * (DISCOUNT_PERCENT / 100);
+    if (discountApplied && discountConfig.enabled) {
+      discountAmount = subtotal * (discountConfig.percent / 100);
     }
     
     const useRoyalMailQr = shouldUseRoyalMailQr(subtotal);
@@ -250,7 +287,7 @@ if (checkoutForm) {
       items: cart,
       subtotal: subtotal,
       discountAmount: discountAmount,
-      discountCode: discountApplied ? DISCOUNT_CODE : null,
+      discountCode: (discountApplied && discountConfig.enabled) ? discountConfig.code : null,
       postage: postage,
       total: total,
       timestamp: new Date().toISOString()
@@ -314,6 +351,7 @@ document.querySelector('.signup-form')?.addEventListener('submit', (event) => {
 updateCartCount();
 renderCart();
 initCheckoutUpsell();
+initDiscountSettings();
 
 // Setup discount code handler - INLINE to ensure it runs
 document.addEventListener('DOMContentLoaded', function() {
@@ -326,10 +364,7 @@ function setupDiscountHandler() {
   const discountInput = document.getElementById('discount-code');
   const discountMessage = document.getElementById('discount-message');
   
-  console.log('setupDiscountHandler called', {btn: !!discountBtn, input: !!discountInput, msg: !!discountMessage});
-  
   if (!discountBtn) {
-    console.warn('Discount button not found');
     return;
   }
   
@@ -338,15 +373,20 @@ function setupDiscountHandler() {
   discountBtn.parentNode.replaceChild(newBtn, discountBtn);
   
   newBtn.addEventListener('click', function(event) {
-    console.log('Apply button clicked!');
     event.preventDefault();
+    if (!discountConfig.enabled) {
+      discountApplied = false;
+      discountMessage.textContent = 'Discount is currently unavailable';
+      discountMessage.style.color = '#ef4444';
+      renderCart();
+      return;
+    }
+
     const code = discountInput.value.trim().toUpperCase();
-    console.log('Code entered: ' + code + ', Expected: ' + DISCOUNT_CODE);
-    
-    if (code === DISCOUNT_CODE) {
-      console.log('✓ Valid discount!');
+
+    if (code === discountConfig.code) {
       discountApplied = true;
-      discountMessage.textContent = '✓ Discount code applied! (10% off)';
+      discountMessage.textContent = `✓ Discount code applied! (${discountConfig.percent}% off)`;
       discountMessage.style.color = '#10b981';
       newBtn.textContent = 'Applied';
       newBtn.disabled = true;
@@ -355,7 +395,6 @@ function setupDiscountHandler() {
       discountMessage.textContent = 'Please enter a code';
       discountMessage.style.color = '#ef4444';
     } else {
-      console.log('✗ Invalid code');
       discountMessage.textContent = 'Invalid discount code';
       discountMessage.style.color = '#ef4444';
     }
@@ -368,7 +407,6 @@ function setupDiscountHandler() {
     }
   });
   
-  console.log('Discount handler setup complete');
 }
 
 // Also try to set it up immediately in case DOM is already loaded

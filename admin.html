@@ -231,6 +231,37 @@
       border-color: #0052cc;
       box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.1);
     }
+
+    .discount-settings-card {
+      max-width: 520px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+
+    .discount-toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .discount-save-btn {
+      background: #0052cc;
+      color: white;
+      border: none;
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .discount-save-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
     
     .stock-actions {
       display: flex;
@@ -471,6 +502,7 @@
       <button class="tab-button active" onclick="switchTab('orders')">Orders</button>
       <button class="tab-button" onclick="switchTab('stock')">Stock Levels</button>
       <button class="tab-button" onclick="switchTab('revenue')">Revenue</button>
+      <button class="tab-button" onclick="switchTab('discount')">Discount</button>
     </div>
     
     <!-- Orders Tab -->
@@ -516,6 +548,19 @@
         </div>
       </div>
     </div>
+
+    <div id="discount" class="tab-content">
+      <h2>Discount Settings</h2>
+      <div id="discount-message" class="message"></div>
+      <div class="discount-settings-card">
+        <p>Control the live 10% discount offer and homepage code popup.</p>
+        <div class="discount-toggle-row">
+          <label for="discount-enabled-toggle" style="font-weight: 600;">Enable 10% discount + popup</label>
+          <input type="checkbox" id="discount-enabled-toggle" style="width: 20px; height: 20px;" />
+        </div>
+        <button class="discount-save-btn" id="save-discount-btn" onclick="saveDiscountSettings()">Save Discount Setting</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -530,6 +575,7 @@
       loadOrders();
       loadStockLevels();
       loadRevenue();
+      loadDiscountSettings();
 
       // Keep orders list fresh so new checkouts appear automatically.
       setInterval(loadOrders, 15000);
@@ -850,6 +896,73 @@
       const msg = document.getElementById('stock-message');
       msg.className = 'message';
       msg.textContent = '';
+    }
+
+    async function loadDiscountSettings() {
+      const token = localStorage.getItem('admin_token');
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/discount-settings', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            logout();
+            return;
+          }
+          throw new Error('Failed to load discount settings');
+        }
+
+        const data = await response.json();
+        const enabled = !!data?.discount?.enabled;
+        const toggle = document.getElementById('discount-enabled-toggle');
+        if (toggle) {
+          toggle.checked = enabled;
+        }
+      } catch (error) {
+        const msg = document.getElementById('discount-message');
+        if (msg) {
+          msg.className = 'message error';
+          msg.textContent = `✗ ${error.message}`;
+        }
+      }
+    }
+
+    async function saveDiscountSettings() {
+      const token = localStorage.getItem('admin_token');
+      const toggle = document.getElementById('discount-enabled-toggle');
+      const button = document.getElementById('save-discount-btn');
+      const msg = document.getElementById('discount-message');
+
+      if (!toggle || !button || !msg) return;
+
+      button.disabled = true;
+      button.textContent = 'Saving...';
+
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/discount-settings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ enabled: toggle.checked })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to save discount settings');
+        }
+
+        msg.className = 'message success';
+        msg.textContent = `✓ Discount ${toggle.checked ? 'enabled' : 'disabled'} successfully`;
+      } catch (error) {
+        msg.className = 'message error';
+        msg.textContent = `✗ ${error.message}`;
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Save Discount Setting';
+      }
     }
     
     async function confirmPayment(orderNumber, button) {
