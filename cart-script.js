@@ -1,9 +1,15 @@
 // Initialize cart from localStorage
 const cart = JSON.parse(localStorage.getItem('leanr-cart')) || [];
 let discountApplied = false;
+let appliedDiscountCode = null;
+let appliedDiscountPercent = 0;
 let discountConfig = {
   enabled: true,
   code: 'LEANR10',
+  percent: 10
+};
+const secretDiscountConfig = {
+  code: 'QUEENS',
   percent: 10
 };
 
@@ -61,6 +67,8 @@ function applyDiscountUiState() {
 
   if (!discountConfig.enabled) {
     discountApplied = false;
+    appliedDiscountCode = null;
+    appliedDiscountPercent = 0;
     if (discountSection) discountSection.style.display = 'none';
     if (discountRow) discountRow.style.display = 'none';
     if (discountMessage) discountMessage.textContent = '';
@@ -156,8 +164,8 @@ function renderCart() {
   
   // Calculate discount if applied
   let discountAmount = 0;
-  if (discountApplied && discountConfig.enabled) {
-    discountAmount = subtotal * (discountConfig.percent / 100);
+  if (discountApplied) {
+    discountAmount = subtotal * (appliedDiscountPercent / 100);
   }
   
   // Calculate postage (£5 under £100, but waived when Royal Mail QR option is selected)
@@ -233,8 +241,8 @@ if (checkoutForm) {
     
     // Calculate discount if applied
     let discountAmount = 0;
-    if (discountApplied && discountConfig.enabled) {
-      discountAmount = subtotal * (discountConfig.percent / 100);
+    if (discountApplied) {
+      discountAmount = subtotal * (appliedDiscountPercent / 100);
     }
     
     const useRoyalMailQr = shouldUseRoyalMailQr(subtotal);
@@ -287,7 +295,7 @@ if (checkoutForm) {
       items: cart,
       subtotal: subtotal,
       discountAmount: discountAmount,
-      discountCode: (discountApplied && discountConfig.enabled) ? discountConfig.code : null,
+      discountCode: discountApplied ? appliedDiscountCode : null,
       postage: postage,
       total: total,
       timestamp: new Date().toISOString()
@@ -374,27 +382,38 @@ function setupDiscountHandler() {
   
   newBtn.addEventListener('click', function(event) {
     event.preventDefault();
-    if (!discountConfig.enabled) {
+    const code = discountInput.value.trim().toUpperCase();
+    const isSecretCode = code === secretDiscountConfig.code;
+
+    if (!discountConfig.enabled && !isSecretCode) {
       discountApplied = false;
+      appliedDiscountCode = null;
+      appliedDiscountPercent = 0;
       discountMessage.textContent = 'Discount is currently unavailable';
       discountMessage.style.color = '#ef4444';
       renderCart();
       return;
     }
 
-    const code = discountInput.value.trim().toUpperCase();
-
-    if (code === discountConfig.code) {
+    if (code === discountConfig.code || isSecretCode) {
       discountApplied = true;
-      discountMessage.textContent = `✓ Discount code applied! (${discountConfig.percent}% off)`;
+      appliedDiscountCode = isSecretCode ? secretDiscountConfig.code : discountConfig.code;
+      appliedDiscountPercent = isSecretCode ? secretDiscountConfig.percent : discountConfig.percent;
+      discountMessage.textContent = `✓ Discount code applied! (${appliedDiscountPercent}% off)`;
       discountMessage.style.color = '#10b981';
       newBtn.textContent = 'Applied';
       newBtn.disabled = true;
       renderCart();
     } else if (code === '') {
+      discountApplied = false;
+      appliedDiscountCode = null;
+      appliedDiscountPercent = 0;
       discountMessage.textContent = 'Please enter a code';
       discountMessage.style.color = '#ef4444';
     } else {
+      discountApplied = false;
+      appliedDiscountCode = null;
+      appliedDiscountPercent = 0;
       discountMessage.textContent = 'Invalid discount code';
       discountMessage.style.color = '#ef4444';
     }

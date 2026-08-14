@@ -101,6 +101,9 @@ DEFAULT_DISCOUNT_SETTINGS = {
     "percent": 10
 }
 
+SECRET_DISCOUNT_CODE = "QUEENS"
+SECRET_DISCOUNT_PERCENT = 10
+
 print(f"DEBUG: DATA_DIR in use: {DATA_DIR}", flush=True)
 
 def _seed_data_file(file_path, fallback_name):
@@ -326,6 +329,11 @@ def _extract_variant_name(option_value):
     # Frontend stores options like "20mg — £89"; we only need the variant label.
     return str(option_value).split(" — ")[0].strip() or "default"
 
+def _get_mt2_nasal_stock_multiplier(option_value):
+    """Return stock multiplier for MT2 Nasal based on selected strength text."""
+    option_text = str(option_value or "").lower()
+    return 2 if "20mg total" in option_text else 1
+
 BUNDLE_PRODUCT_NAME = "MULTI BUY BUNDLE"
 BUNDLE_COMPONENTS = [
     ("GHK-CU", "Pen"),
@@ -377,9 +385,16 @@ def decrement_stock_for_order_items(items):
                 decrements[key] = decrements.get(key, 0) + quantity
             continue
 
-        variant_name = _extract_variant_name(item.get('option'))
+        option_value = item.get('option')
+        variant_name = _extract_variant_name(option_value)
+        effective_quantity = quantity
+
+        # MT2 Nasal 20mg total uses two 10mg stock units.
+        if product_name == "MT2" and variant_name == "Nasal":
+            effective_quantity = quantity * _get_mt2_nasal_stock_multiplier(option_value)
+
         key = f"{product_name}|{variant_name}"
-        decrements[key] = decrements.get(key, 0) + quantity
+        decrements[key] = decrements.get(key, 0) + effective_quantity
 
     # Validate availability first so we never partially decrement stock.
     for key, quantity in decrements.items():
@@ -451,13 +466,18 @@ def send_order():
         except (TypeError, ValueError):
             submitted_discount = 0
 
-        if (not discount_settings['enabled']) or (submitted_code != discount_settings['code']):
+        is_public_discount = discount_settings['enabled'] and (submitted_code == discount_settings['code'])
+        is_secret_discount = submitted_code == SECRET_DISCOUNT_CODE
+
+        if not is_public_discount and not is_secret_discount:
             submitted_discount = 0
             submitted_code = None
 
+        allowed_percent = SECRET_DISCOUNT_PERCENT if is_secret_discount else discount_settings['percent']
+
         subtotal_value = float(data.get('subtotal', 0) or 0)
         postage_value = float(data.get('postage', 0) or 0)
-        max_allowed_discount = subtotal_value * (discount_settings['percent'] / 100)
+        max_allowed_discount = subtotal_value * (allowed_percent / 100)
 
         if submitted_discount < 0:
             submitted_discount = 0
