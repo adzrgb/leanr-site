@@ -28,4 +28,6 @@ wheels/
 !stock.json
 !orders.json
 !newsletter_emails.json
+!product_visibility.json
+!product_suggestions.json
 .env

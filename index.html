@@ -90,8 +90,9 @@
           <h2>Premium peptide selection, ready to order.</h2>
         </div>
         <div class="product-grid">
-          <article class="product-card featured-product" data-modal="modal-retatrutide">
+          <article class="product-card featured-product" data-product="RETATRUTIDE" data-modal="modal-retatrutide">
             <span class="product-badge">In stock</span>
+            <img class="product-image" src="RETA.png" alt="Retatrutide 20mg and 40mg pens">
             <h3>RETATRUTIDE</h3>
             <p>Triple GIP/GLP-1/GCG receptor agonist. Supports weight management, appetite regulation, and metabolic health.</p>
             <label class="select-label" for="strength-select">Select strength</label>
@@ -107,8 +108,9 @@
             <button class="view-info-btn">View info</button>
           </article>
 
-          <article class="product-card" data-modal="modal-tirzepetide">
+          <article class="product-card" data-product="TIRZEPETIDE" data-modal="modal-tirzepetide">
             <span class="product-badge">In stock</span>
+            <img class="product-image" src="TIRZ.png" alt="Tirzepetide product pen">
             <h3>TIRZEPETIDE</h3>
             <p>Dual GIP/GLP-1 receptor agonist. Researched for weight management, appetite control, and improved metabolic function.</p>
             <label class="select-label" for="tirze-select">Select strength</label>
@@ -124,7 +126,7 @@
             <button class="view-info-btn">View info</button>
           </article>
 
-          <article class="product-card" data-modal="modal-mt1">
+          <article class="product-card" data-product="MT1" data-modal="modal-mt1">
             <span class="product-badge">In stock</span>
             <h3>MT1</h3>
             <p>Melanocyte-stimulating hormone peptide. Supports natural melanin production, tanning, and skin health. 10mg.</p>
@@ -141,8 +143,9 @@
             <button class="view-info-btn">View info</button>
           </article>
 
-          <article class="product-card" data-modal="modal-mt2">
+          <article class="product-card" data-product="MT2" data-modal="modal-mt2">
             <span class="product-badge">In stock</span>
+            <img class="product-image" src="MT2.png" alt="MT2 peptide product">
             <h3>MT2</h3>
             <p>Melanocyte-stimulating hormone peptide. Supports tanning routines and skin appearance. Choose 10mg or add an extra 10mg (20mg total).</p>
             <label class="select-label" for="mt2-select">Format</label>
@@ -159,7 +162,7 @@
             <button class="view-info-btn">View info</button>
           </article>
 
-          <article class="product-card" data-modal="modal-multi-bundle">
+          <article class="product-card" data-product="MULTI BUY BUNDLE" data-modal="modal-multi-bundle">
             <span class="product-badge">In stock</span>
             <h3>MULTI BUY BUNDLE</h3>
             <p>Bundle deal: 1 x GHK-CU Pen, 1 x MT2 Nasal, and 1 x MT2 Pen in one order.</p>
@@ -170,8 +173,9 @@
             <button class="view-info-btn">View info</button>
           </article>
 
-          <article class="product-card" data-modal="modal-ghkcu">
+          <article class="product-card" data-product="GHK-CU" data-modal="modal-ghkcu">
             <span class="product-badge">In stock</span>
+            <img class="product-image" src="unnamed.jpg" alt="GHK-CU peptide product">
             <h3>GHK-CU</h3>
             <p>Copper peptide studied for skin repair, collagen production, and tissue regeneration. 100mg.</p>
             <label class="select-label" for="ghk-select">Format</label>
@@ -187,8 +191,9 @@
             <button class="view-info-btn">View info</button>
           </article>
 
-          <article class="product-card" data-modal="modal-klow">
+          <article class="product-card" data-product="KLOW PEN" data-modal="modal-klow">
             <span class="product-badge">In stock</span>
+            <img class="product-image" src="KLOW.png" alt="KLOW peptide pen product">
             <h3>KLOW PEN</h3>
             <p>Advanced peptide blend combining four complementary peptides for recovery, performance, and overall wellness support.</p>
             <div class="product-meta">
@@ -199,7 +204,7 @@
             <button class="view-info-btn">View info</button>
           </article>
 
-          <article class="product-card" data-modal="modal-cagri">
+          <article class="product-card" data-product="CAGRI" data-modal="modal-cagri">
             <span class="product-badge">In stock</span>
             <h3>CAGRI</h3>
             <p>Amylin peptide that regulates appetite and promotes satiety. Studied for supporting weight management through natural mechanisms. 10mg.</p>
@@ -210,6 +215,24 @@
             <div class="stock-info" id="cagri-stock-info" style="font-size: 0.85rem; color: #64748b; margin-top: 0.5rem;"></div>
             <button class="view-info-btn">View info</button>
           </article>
+        </div>
+      </section>
+
+      <section class="section suggestions-section" aria-labelledby="suggestions-heading">
+        <div class="suggestions-panel">
+          <div>
+            <p class="eyebrow">Help shape the store</p>
+            <h2 id="suggestions-heading">What product would you like to see next?</h2>
+            <p>Tell us what you would like LEANr to stock. Your suggestion goes directly to our team.</p>
+          </div>
+          <form id="suggestions-form" class="suggestions-form">
+            <label for="product-suggestion">Your product suggestion</label>
+            <textarea id="product-suggestion" name="suggestion" rows="3" maxlength="1000" placeholder="For example: a peptide or research product you would like us to add" required></textarea>
+            <div class="suggestions-form-footer">
+              <span id="suggestions-message" role="status" aria-live="polite"></span>
+              <button type="submit">Send suggestion</button>
+            </div>
+          </form>
         </div>
       </section>
 

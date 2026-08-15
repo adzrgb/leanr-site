@@ -3,10 +3,26 @@ let cart = JSON.parse(localStorage.getItem('leanr-cart')) || [];
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   initBannerClose();
+  initProductVisibility();
   initStockStatus();
   initDiscountPopup();
   initCookieConsent();
 });
+
+function initProductVisibility() {
+  fetch(window.location.origin + '/api/public/product-visibility')
+    .then(res => res.json())
+    .then(data => {
+      const visibility = data.visibility || {};
+      document.querySelectorAll('.product-card[data-product]').forEach(card => {
+        const productName = card.dataset.product;
+        card.hidden = visibility[productName] === false;
+      });
+    })
+    .catch(() => {
+      // Keep products visible if the settings request is unavailable.
+    });
+}
 
 // Handle cookie consent
 function initCookieConsent() {
@@ -524,6 +540,45 @@ document.querySelector('.signup-form')?.addEventListener('submit', (event) => {
     alert('Thanks for joining LEANr.');
     input.value = '';
   });
+});
+
+document.getElementById('suggestions-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+  const input = form.querySelector('textarea');
+  const message = document.getElementById('suggestions-message');
+  const button = form.querySelector('button');
+  const suggestion = input.value.trim();
+
+  if (!suggestion) return;
+
+  button.disabled = true;
+  button.textContent = 'Sending...';
+  message.textContent = '';
+
+  try {
+    const response = await fetch(window.location.origin + '/api/suggestions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ suggestion })
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Unable to send suggestion');
+    }
+
+    input.value = '';
+    message.style.color = '#15803d';
+    message.textContent = 'Thanks, your suggestion was sent.';
+  } catch (error) {
+    message.style.color = '#b91c1c';
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Send suggestion';
+  }
 });
 
 // Review carousel functionality

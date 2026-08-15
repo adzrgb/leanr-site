@@ -262,6 +262,60 @@
       opacity: 0.7;
       cursor: not-allowed;
     }
+
+    .visibility-settings-card {
+      max-width: 620px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+
+    .visibility-product-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.85rem 0;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .visibility-product-row:last-child {
+      border-bottom: 0;
+    }
+
+    .visibility-product-row input {
+      width: 20px;
+      height: 20px;
+      flex: 0 0 auto;
+    }
+
+    .suggestions-admin-list {
+      max-width: 760px;
+    }
+
+    .suggestion-admin-card {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: flex-start;
+      border: 1px solid #e2e8f0;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .suggestion-admin-text {
+      margin: 0 0 0.5rem;
+      white-space: pre-wrap;
+      color: #0f172a;
+    }
+
+    .suggestion-admin-date {
+      color: #64748b;
+      font-size: 0.85rem;
+    }
     
     .stock-actions {
       display: flex;
@@ -540,6 +594,8 @@
       <button class="tab-button" onclick="switchTab('stock')">Stock Levels</button>
       <button class="tab-button" onclick="switchTab('revenue')">Revenue</button>
       <button class="tab-button" onclick="switchTab('discount')">Discount</button>
+      <button class="tab-button" onclick="switchTab('visibility')">Products</button>
+      <button class="tab-button" onclick="switchTab('suggestions')">Suggestions</button>
     </div>
     
     <!-- Orders Tab -->
@@ -601,6 +657,26 @@
         <button class="discount-save-btn" id="save-discount-btn" onclick="saveDiscountSettings()">Save Discount Setting</button>
       </div>
     </div>
+
+    <div id="visibility" class="tab-content">
+      <h2>Storefront Products</h2>
+      <div id="visibility-message" class="message"></div>
+      <div class="visibility-settings-card">
+        <p>Choose which products appear on the public store. Unchecked products are hidden from customers but remain available in your admin data.</p>
+        <div id="visibility-list">
+          <div class="empty-state">Loading product visibility...</div>
+        </div>
+        <button class="discount-save-btn" id="save-visibility-btn" onclick="saveProductVisibility()">Save Product Visibility</button>
+      </div>
+    </div>
+
+    <div id="suggestions" class="tab-content">
+      <h2>Product Suggestions</h2>
+      <div id="suggestions-admin-message" class="message"></div>
+      <div id="suggestions-admin-list" class="suggestions-admin-list">
+        <div class="empty-state">Loading suggestions...</div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -616,6 +692,8 @@
       loadStockLevels();
       loadRevenue();
       loadDiscountSettings();
+      loadProductVisibility();
+      loadSuggestions();
 
       // Keep orders list fresh so new checkouts appear automatically.
       setInterval(loadOrders, 15000);
@@ -1005,6 +1083,164 @@
       } finally {
         button.disabled = false;
         button.textContent = 'Save Discount Setting';
+      }
+    }
+
+    const storefrontProducts = [
+      'RETATRUTIDE',
+      'TIRZEPETIDE',
+      'MT1',
+      'MT2',
+      'MULTI BUY BUNDLE',
+      'GHK-CU',
+      'KLOW PEN',
+      'CAGRI'
+    ];
+
+    async function loadProductVisibility() {
+      const token = localStorage.getItem('admin_token');
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/product-visibility', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            logout();
+            return;
+          }
+          throw new Error('Failed to load product visibility');
+        }
+
+        const data = await response.json();
+        const visibility = data.visibility || {};
+        document.getElementById('visibility-list').innerHTML = storefrontProducts.map(productName => `
+          <label class="visibility-product-row">
+            <span>${productName}</span>
+            <input type="checkbox" data-product-visibility="${productName}" ${visibility[productName] !== false ? 'checked' : ''}>
+          </label>
+        `).join('');
+      } catch (error) {
+        const msg = document.getElementById('visibility-message');
+        msg.className = 'message error';
+        msg.textContent = `✗ ${error.message}`;
+      }
+    }
+
+    async function saveProductVisibility() {
+      const token = localStorage.getItem('admin_token');
+      const button = document.getElementById('save-visibility-btn');
+      const msg = document.getElementById('visibility-message');
+      const visibility = {};
+
+      document.querySelectorAll('[data-product-visibility]').forEach(toggle => {
+        visibility[toggle.dataset.productVisibility] = toggle.checked;
+      });
+
+      button.disabled = true;
+      button.textContent = 'Saving...';
+
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/product-visibility', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ visibility })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to save product visibility');
+        }
+
+        msg.className = 'message success';
+        msg.textContent = '✓ Product visibility saved successfully';
+      } catch (error) {
+        msg.className = 'message error';
+        msg.textContent = `✗ ${error.message}`;
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Save Product Visibility';
+      }
+    }
+
+    async function loadSuggestions() {
+      const token = localStorage.getItem('admin_token');
+      const list = document.getElementById('suggestions-admin-list');
+
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/suggestions', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            logout();
+            return;
+          }
+          throw new Error('Failed to load suggestions');
+        }
+
+        const data = await response.json();
+        list.innerHTML = '';
+
+        if (!data.suggestions?.length) {
+          list.innerHTML = '<div class="empty-state">No product suggestions yet.</div>';
+          return;
+        }
+
+        data.suggestions.forEach(item => {
+          const card = document.createElement('article');
+          card.className = 'suggestion-admin-card';
+
+          const content = document.createElement('div');
+          const text = document.createElement('p');
+          text.className = 'suggestion-admin-text';
+          text.textContent = item.suggestion;
+          const date = document.createElement('div');
+          date.className = 'suggestion-admin-date';
+          date.textContent = new Date(item.timestamp).toLocaleString();
+          content.append(text, date);
+
+          const deleteButton = document.createElement('button');
+          deleteButton.className = 'delete-order-btn';
+          deleteButton.type = 'button';
+          deleteButton.title = 'Delete suggestion';
+          deleteButton.setAttribute('aria-label', 'Delete suggestion');
+          deleteButton.textContent = '×';
+          deleteButton.addEventListener('click', () => deleteSuggestion(item.id, deleteButton));
+
+          card.append(content, deleteButton);
+          list.appendChild(card);
+        });
+      } catch (error) {
+        list.innerHTML = `<div class="empty-state">Error loading suggestions: ${error.message}</div>`;
+      }
+    }
+
+    async function deleteSuggestion(suggestionId, button) {
+      if (!confirm('Delete this product suggestion?')) return;
+
+      button.disabled = true;
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/delete-suggestion', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+          },
+          body: JSON.stringify({ id: suggestionId })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to delete suggestion');
+        await loadSuggestions();
+      } catch (error) {
+        const msg = document.getElementById('suggestions-admin-message');
+        msg.className = 'message error';
+        msg.textContent = `✗ ${error.message}`;
       }
     }
     

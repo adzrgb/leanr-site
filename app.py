@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from datetime import datetime
 import json
@@ -103,17 +103,32 @@ STOCK_FILE = os.path.join(DATA_DIR, "stock.json")
 EMAILS_FILE = os.path.join(DATA_DIR, "newsletter_emails.json")
 EMAIL_QUEUE_FILE = os.path.join(DATA_DIR, "email_queue.json")
 DISCOUNT_SETTINGS_FILE = os.path.join(DATA_DIR, "discount_settings.json")
+PRODUCT_VISIBILITY_FILE = os.path.join(DATA_DIR, "product_visibility.json")
+PRODUCT_SUGGESTIONS_FILE = os.path.join(DATA_DIR, "product_suggestions.json")
 
 ORDERS_KEY = "orders"
 STOCK_KEY = "stock"
 EMAILS_KEY = "newsletter_emails"
 EMAIL_QUEUE_KEY = "email_queue"
 DISCOUNT_SETTINGS_KEY = "discount_settings"
+PRODUCT_VISIBILITY_KEY = "product_visibility"
+PRODUCT_SUGGESTIONS_KEY = "product_suggestions"
 
 DEFAULT_DISCOUNT_SETTINGS = {
     "enabled": True,
     "code": "LEANR10",
     "percent": 10
+}
+
+DEFAULT_PRODUCT_VISIBILITY = {
+    "RETATRUTIDE": True,
+    "TIRZEPETIDE": True,
+    "MT1": True,
+    "MT2": True,
+    "MULTI BUY BUNDLE": True,
+    "GHK-CU": True,
+    "KLOW PEN": True,
+    "CAGRI": True
 }
 
 SECRET_DISCOUNT_CODE = "QUEENS"
@@ -229,6 +244,12 @@ def load_newsletter_data():
 def save_newsletter_data(emails):
     save_state(EMAILS_KEY, EMAILS_FILE, emails)
 
+def load_product_suggestions_data():
+    return load_state(PRODUCT_SUGGESTIONS_KEY, PRODUCT_SUGGESTIONS_FILE, [])
+
+def save_product_suggestions_data(suggestions):
+    save_state(PRODUCT_SUGGESTIONS_KEY, PRODUCT_SUGGESTIONS_FILE, suggestions)
+
 def load_email_queue_data():
     return load_state(EMAIL_QUEUE_KEY, EMAIL_QUEUE_FILE, [])
 
@@ -269,6 +290,30 @@ def set_discount_enabled(enabled):
     settings['enabled'] = bool(enabled)
     save_discount_settings_data(settings)
     return settings
+
+def load_product_visibility_data():
+    return load_state(PRODUCT_VISIBILITY_KEY, PRODUCT_VISIBILITY_FILE, DEFAULT_PRODUCT_VISIBILITY)
+
+def save_product_visibility_data(visibility):
+    save_state(PRODUCT_VISIBILITY_KEY, PRODUCT_VISIBILITY_FILE, visibility)
+
+def get_product_visibility():
+    raw = load_product_visibility_data()
+    if not isinstance(raw, dict):
+        raw = {}
+
+    return {
+        product_name: bool(raw.get(product_name, is_visible))
+        for product_name, is_visible in DEFAULT_PRODUCT_VISIBILITY.items()
+    }
+
+def set_product_visibility(visibility):
+    current = get_product_visibility()
+    for product_name in DEFAULT_PRODUCT_VISIBILITY:
+        if product_name in visibility:
+            current[product_name] = bool(visibility[product_name])
+    save_product_visibility_data(current)
+    return current
 
 # Initialize stock file if it doesn't exist
 default_stock = {
@@ -333,9 +378,15 @@ if stock_changed:
 if not load_discount_settings_data():
     save_discount_settings_data(DEFAULT_DISCOUNT_SETTINGS)
 
+if not load_product_visibility_data():
+    save_product_visibility_data(DEFAULT_PRODUCT_VISIBILITY)
+
 _seed_data_file(ORDERS_FILE, "orders.json")
 _seed_data_file(EMAILS_FILE, "newsletter_emails.json")
 _seed_data_file(EMAIL_QUEUE_FILE, "email_queue.json")
+
+if not os.path.exists(PRODUCT_SUGGESTIONS_FILE):
+    save_product_suggestions_data([])
 
 def _extract_variant_name(option_value):
     """Normalize cart option text to a stock variant name."""
@@ -2195,6 +2246,14 @@ def get_public_discount_settings():
         print(f"ERROR fetching discount settings: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/public/product-visibility', methods=['GET'])
+def get_public_product_visibility():
+    try:
+        return jsonify({'visibility': get_product_visibility()}), 200
+    except Exception as e:
+        print(f"ERROR fetching product visibility: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/admin/discount-settings', methods=['GET', 'POST', 'OPTIONS'])
 def admin_discount_settings():
     if request.method == 'OPTIONS':
@@ -2220,6 +2279,34 @@ def admin_discount_settings():
         return jsonify({'success': True, 'discount': settings}), 200
     except Exception as e:
         print(f"ERROR updating discount settings: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/product-visibility', methods=['GET', 'POST', 'OPTIONS'])
+def admin_product_visibility():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        token = auth_header.replace('Bearer ', '')
+        if not verify_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+
+        if request.method == 'GET':
+            return jsonify({'visibility': get_product_visibility()}), 200
+
+        data = request.json or {}
+        visibility = data.get('visibility')
+        if not isinstance(visibility, dict):
+            return jsonify({'error': 'Visibility must be an object'}), 400
+
+        settings = set_product_visibility(visibility)
+        return jsonify({'success': True, 'visibility': settings}), 200
+    except Exception as e:
+        print(f"ERROR updating product visibility: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # Newsletter email endpoint
@@ -2250,6 +2337,78 @@ def newsletter_subscribe():
         return jsonify({'success': True, 'message': 'Subscribed successfully'}), 200
     except Exception as e:
         print(f"ERROR: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/suggestions', methods=['POST', 'OPTIONS'])
+def submit_product_suggestion():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        data = request.get_json(silent=True) or {}
+        suggestion_text = str(data.get('suggestion', '')).strip()
+
+        if len(suggestion_text) < 2:
+            return jsonify({'error': 'Please enter a product suggestion'}), 400
+        if len(suggestion_text) > 1000:
+            return jsonify({'error': 'Suggestion must be 1000 characters or fewer'}), 400
+
+        suggestions = load_product_suggestions_data()
+        suggestions.append({
+            'id': secrets.token_urlsafe(8),
+            'suggestion': suggestion_text,
+            'timestamp': datetime.now().isoformat()
+        })
+        save_product_suggestions_data(suggestions)
+
+        return jsonify({'success': True, 'message': 'Thanks, your suggestion has been sent'}), 201
+    except Exception as e:
+        print(f"ERROR saving product suggestion: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/suggestions', methods=['GET'])
+def get_product_suggestions():
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        token = auth_header.replace('Bearer ', '')
+        if not verify_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+
+        suggestions = load_product_suggestions_data()
+        return jsonify({'suggestions': list(reversed(suggestions))}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/delete-suggestion', methods=['POST', 'OPTIONS'])
+def delete_product_suggestion():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        token = auth_header.replace('Bearer ', '')
+        if not verify_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+
+        data = request.get_json(silent=True) or {}
+        suggestion_id = data.get('id')
+        if not suggestion_id:
+            return jsonify({'error': 'Suggestion id is required'}), 400
+
+        suggestions = load_product_suggestions_data()
+        filtered = [item for item in suggestions if item.get('id') != suggestion_id]
+        if len(filtered) == len(suggestions):
+            return jsonify({'error': 'Suggestion not found'}), 404
+
+        save_product_suggestions_data(filtered)
+        return jsonify({'success': True}), 200
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 # Admin dashboard stats
@@ -2297,25 +2456,25 @@ def get_stats():
 @app.route('/')
 def serve_index():
     """Serve index.html"""
-    with open('index.html') as f:
+    with open('index.html', encoding='utf-8') as f:
         return f.read()
 
 @app.route('/index.html')
 def serve_index_explicit():
     """Serve index.html (explicit route)"""
-    with open('index.html') as f:
+    with open('index.html', encoding='utf-8') as f:
         return f.read()
 
 @app.route('/cart.html')
 def serve_cart():
     """Serve cart.html"""
-    with open('cart.html') as f:
+    with open('cart.html', encoding='utf-8') as f:
         return f.read()
 
 @app.route('/admin.html')
 def serve_admin():
     """Serve admin.html"""
-    with open('admin.html') as f:
+    with open('admin.html', encoding='utf-8') as f:
         return f.read(), 200, {
             'Content-Type': 'text/html; charset=utf-8',
             'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
@@ -2327,20 +2486,29 @@ def serve_admin():
 @app.route('/styles.css')
 def serve_styles():
     """Serve styles.css"""
-    with open('styles.css') as f:
+    with open('styles.css', encoding='utf-8') as f:
         return f.read(), 200, {'Content-Type': 'text/css'}
 
 @app.route('/script.js')
 def serve_script():
     """Serve script.js"""
-    with open('script.js') as f:
+    with open('script.js', encoding='utf-8') as f:
         return f.read(), 200, {'Content-Type': 'application/javascript'}
 
 @app.route('/cart-script.js')
 def serve_cart_script():
     """Serve cart-script.js"""
-    with open('cart-script.js') as f:
+    with open('cart-script.js', encoding='utf-8') as f:
         return f.read(), 200, {'Content-Type': 'application/javascript'}
+
+@app.route('/<path:filename>')
+def serve_image_asset(filename):
+    """Serve only image assets from the project root."""
+    allowed_extensions = {'.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico'}
+    extension = os.path.splitext(filename)[1].lower()
+    if extension not in allowed_extensions or '/' in filename or '\\' in filename:
+        return jsonify({'error': 'Not found'}), 404
+    return send_from_directory('.', filename)
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
