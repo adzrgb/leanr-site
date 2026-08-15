@@ -57,6 +57,7 @@ SENDCLOUD_SECRET_KEY = os.getenv("SENDCLOUD_SECRET_KEY", "")
 SENDCLOUD_BASE_URL = os.getenv("SENDCLOUD_BASE_URL", "https://panel.sendcloud.sc/api/v2").rstrip("/")
 SENDCLOUD_SHIPPING_METHOD_ID = os.getenv("SENDCLOUD_SHIPPING_METHOD_ID", "")
 SENDCLOUD_DEFAULT_COUNTRY = os.getenv("SENDCLOUD_DEFAULT_COUNTRY", "GB")
+SENDCLOUD_METHOD_HINT = os.getenv("SENDCLOUD_METHOD_HINT", "tracked 24")
 
 print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}", flush=True)
 print(f"DEBUG: Resend API key present: {'Yes' if RESEND_API_KEY else 'No - emails will not send'}", flush=True)
@@ -69,7 +70,7 @@ print(f"DEBUG: Email provider priority: Resend, then Brevo, then SMTP, then queu
 print(f"DEBUG: Auto print labels enabled: {'Yes' if AUTO_PRINT_LABELS else 'No'}", flush=True)
 print(f"DEBUG: PrintNode configured: {'Yes' if PRINTNODE_API_KEY and PRINTNODE_PRINTER_ID else 'No'}", flush=True)
 print(f"DEBUG: Sendcloud enabled: {'Yes' if SENDCLOUD_ENABLED else 'No'}", flush=True)
-print(f"DEBUG: Sendcloud configured: {'Yes' if SENDCLOUD_PUBLIC_KEY and SENDCLOUD_SECRET_KEY and SENDCLOUD_SHIPPING_METHOD_ID else 'No'}", flush=True)
+print(f"DEBUG: Sendcloud configured: {'Yes' if SENDCLOUD_PUBLIC_KEY and SENDCLOUD_SECRET_KEY else 'No'}", flush=True)
 
 # Optional Supabase state storage (orders/stock/newsletter/queue).
 # Email confirmation logic stays unchanged; only persistence backend changes.
@@ -1025,6 +1026,56 @@ def _download_sendcloud_label_pdf(label_url):
     except Exception as e:
         return False, f"Sendcloud label download exception: {str(e)}", b""
 
+def resolve_sendcloud_shipping_method_id():
+    """Resolve shipping method ID from env or Sendcloud shipping method lookup."""
+    if SENDCLOUD_SHIPPING_METHOD_ID:
+        try:
+            return True, int(SENDCLOUD_SHIPPING_METHOD_ID), ""
+        except (TypeError, ValueError):
+            return False, None, "SENDCLOUD_SHIPPING_METHOD_ID must be a number"
+
+    try:
+        response = requests.get(
+            f"{SENDCLOUD_BASE_URL}/shipping_methods",
+            auth=(SENDCLOUD_PUBLIC_KEY, SENDCLOUD_SECRET_KEY),
+            timeout=20
+        )
+        if response.status_code != 200:
+            return False, None, f"Sendcloud shipping methods lookup failed: {response.status_code}"
+
+        payload = response.json() if response.content else {}
+        methods = payload.get('shipping_methods', [])
+        if not isinstance(methods, list) or not methods:
+            return False, None, "No Sendcloud shipping methods returned"
+
+        method_hint = SENDCLOUD_METHOD_HINT.strip().lower()
+
+        # Prefer explicit Royal Mail + Tracked 24 style matches.
+        best_match = None
+        for method in methods:
+            name = str(method.get('name') or '').lower()
+            carrier = str(method.get('carrier') or method.get('carrier_name') or '').lower()
+            if ('tracked' in name and '24' in name) and ('royal' in carrier or 'mail' in carrier or 'royal' in name):
+                best_match = method
+                break
+
+        if not best_match and method_hint:
+            for method in methods:
+                name = str(method.get('name') or '').lower()
+                if method_hint in name:
+                    best_match = method
+                    break
+
+        if not best_match:
+            return False, None, "Could not auto-match a Sendcloud Tracked 24 shipping method"
+
+        try:
+            return True, int(best_match.get('id')), ""
+        except (TypeError, ValueError):
+            return False, None, "Matched Sendcloud method has invalid id"
+    except Exception as e:
+        return False, None, f"Sendcloud shipping method lookup exception: {str(e)}"
+
 def create_sendcloud_tracked24_label(order):
     """Create a Sendcloud parcel and request a carrier label."""
     if not SENDCLOUD_ENABLED:
@@ -1033,13 +1084,9 @@ def create_sendcloud_tracked24_label(order):
     if not SENDCLOUD_PUBLIC_KEY or not SENDCLOUD_SECRET_KEY:
         return False, "Sendcloud API keys are missing", {}
 
-    if not SENDCLOUD_SHIPPING_METHOD_ID:
-        return False, "SENDCLOUD_SHIPPING_METHOD_ID is missing", {}
-
-    try:
-        shipping_method_id = int(SENDCLOUD_SHIPPING_METHOD_ID)
-    except (TypeError, ValueError):
-        return False, "SENDCLOUD_SHIPPING_METHOD_ID must be a number", {}
+    resolved, shipping_method_id, method_error = resolve_sendcloud_shipping_method_id()
+    if not resolved:
+        return False, method_error, {}
 
     street, house_number = _split_address_for_sendcloud(order.get('deliveryAddress', ''))
 
