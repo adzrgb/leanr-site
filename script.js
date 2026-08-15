@@ -16,7 +16,10 @@ function initProductVisibility() {
       const visibility = data.visibility || {};
       document.querySelectorAll('.product-card[data-product]').forEach(card => {
         const productName = card.dataset.product;
-        card.hidden = visibility[productName] === false;
+        const isHidden = visibility[productName] === false;
+        card.hidden = isHidden;
+        card.classList.toggle('product-hidden', isHidden);
+        card.style.display = isHidden ? 'none' : '';
       });
     })
     .catch(() => {

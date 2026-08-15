@@ -439,6 +439,11 @@ main {
   position: relative;
 }
 
+.product-card.product-hidden,
+.product-card[hidden] {
+  display: none !important;
+}
+
 .product-image {
   display: block;
   width: 100%;
