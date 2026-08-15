@@ -992,7 +992,10 @@
         if (response.ok) {
           const msg = document.getElementById('orders-message');
           msg.className = 'message success';
-          msg.textContent = 'Payment confirmed! Email sent to customer.';
+          const labelStatus = data.labelPrinted
+            ? ' Shipping label printed automatically.'
+            : (data.labelMessage ? ` Label print: ${data.labelMessage}.` : '');
+          msg.textContent = `Payment confirmed! Email sent to customer.${labelStatus}`;
           setTimeout(() => msg.className = 'message', 4000);
           
           // Refresh orders list

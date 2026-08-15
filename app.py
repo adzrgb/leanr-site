@@ -5,6 +5,7 @@ import json
 import os
 import secrets
 import hashlib
+from html import escape
 import time
 import random
 from dotenv import load_dotenv
@@ -47,6 +48,9 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USERNAME = os.getenv("SMTP_USERNAME", BUSINESS_EMAIL)
 SMTP_PASSWORD = os.getenv("BUSINESS_EMAIL_PASSWORD", "")
 SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+AUTO_PRINT_LABELS = os.getenv("AUTO_PRINT_LABELS", "false").lower() == "true"
+PRINTNODE_API_KEY = os.getenv("PRINTNODE_API_KEY", "")
+PRINTNODE_PRINTER_ID = os.getenv("PRINTNODE_PRINTER_ID", "")
 
 print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}", flush=True)
 print(f"DEBUG: Resend API key present: {'Yes' if RESEND_API_KEY else 'No - emails will not send'}", flush=True)
@@ -56,6 +60,8 @@ print(f"DEBUG: Resend from: {RESEND_FROM_EMAIL}", flush=True)
 print(f"DEBUG: Brevo sender: {BREVO_SENDER_NAME} <{BREVO_SENDER_EMAIL}>", flush=True)
 print(f"DEBUG: SMTP fallback configured: {'Yes' if SMTP_PASSWORD else 'No'}", flush=True)
 print(f"DEBUG: Email provider priority: Resend, then Brevo, then SMTP, then queue", flush=True)
+print(f"DEBUG: Auto print labels enabled: {'Yes' if AUTO_PRINT_LABELS else 'No'}", flush=True)
+print(f"DEBUG: PrintNode configured: {'Yes' if PRINTNODE_API_KEY and PRINTNODE_PRINTER_ID else 'No'}", flush=True)
 
 # Optional Supabase state storage (orders/stock/newsletter/queue).
 # Email confirmation logic stays unchanged; only persistence backend changes.
@@ -943,6 +949,133 @@ def parse_data_url_attachment(data_url, default_name="qr-photo"):
         "content_type": mime_type
     }
 
+def build_shipping_label_text(order):
+    """Build a printable shipping label body for an order."""
+    order_number = order.get('orderNumber', 'UNKNOWN')
+    customer_name = order.get('customerName', '').strip()
+    address = order.get('deliveryAddress', '').strip()
+    city = order.get('city', '').strip()
+    postcode = order.get('postcode', '').strip()
+    phone = order.get('customerPhone', '').strip()
+
+    items_lines = []
+    for item in order.get('items', []):
+        item_name = str(item.get('name', 'Item')).strip()
+        item_option = str(item.get('option') or '').strip()
+        quantity = int(item.get('quantity', 1) or 1)
+        option_suffix = f" ({item_option})" if item_option else ""
+        items_lines.append(f"- {quantity} x {item_name}{option_suffix}")
+
+    if not items_lines:
+        items_lines.append("- No items listed")
+
+    qr_reference = str(order.get('royalMailQrCode') or '').strip()
+    qr_block = ""
+    if order.get('useRoyalMailQr') and qr_reference:
+        qr_block = f"\nROYAL MAIL QR REF: {qr_reference}"
+
+    return (
+        "LEANr SHIPPING LABEL\n"
+        "====================\n"
+        f"ORDER: {order_number}\n"
+        f"PAID: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        "\n"
+        "SHIP TO:\n"
+        f"{customer_name}\n"
+        f"{address}\n"
+        f"{city}\n"
+        f"{postcode}\n"
+        f"TEL: {phone}\n"
+        f"{qr_block}\n"
+        "\n"
+        "ITEMS:\n"
+        f"{'\n'.join(items_lines)}\n"
+    )
+
+def send_shipping_label_to_printnode(order, label_text):
+    """Send a raw text label to PrintNode. Returns (ok, error_message)."""
+    if not AUTO_PRINT_LABELS:
+        return False, "AUTO_PRINT_LABELS is disabled"
+
+    if not PRINTNODE_API_KEY or not PRINTNODE_PRINTER_ID:
+        return False, "PrintNode credentials are missing"
+
+    try:
+        printer_id = int(PRINTNODE_PRINTER_ID)
+    except (TypeError, ValueError):
+        return False, "PRINTNODE_PRINTER_ID must be a number"
+
+    try:
+        payload = {
+            "printerId": printer_id,
+            "title": f"LEANr Shipping Label - {order.get('orderNumber', 'UNKNOWN')}",
+            "contentType": "raw_base64",
+            "content": base64.b64encode(label_text.encode('utf-8')).decode('ascii'),
+            "source": "LEANr Auto Label"
+        }
+        response = requests.post(
+            "https://api.printnode.com/printjobs",
+            auth=(PRINTNODE_API_KEY, ""),
+            json=payload,
+            timeout=15
+        )
+        if response.status_code in (200, 201):
+            return True, ""
+
+        return False, f"PrintNode error: {response.status_code} - {response.text}"
+    except Exception as e:
+        return False, f"PrintNode request failed: {str(e)}"
+
+def send_shipping_label_fallback_email(order, label_text, reason):
+    """Fallback path if auto-print is enabled but the print job fails."""
+    order_number = order.get('orderNumber', 'UNKNOWN')
+    html_body = f"""
+    <html>
+      <body style=\"font-family: Arial, sans-serif; color: #1f2937;\">
+        <h2>Shipping Label Fallback - {order_number}</h2>
+        <p>Automatic printing failed after payment confirmation.</p>
+        <p><strong>Reason:</strong> {escape(reason)}</p>
+        <p>Please print the attached label manually.</p>
+        <pre style=\"background:#f8fafc;padding:12px;border:1px solid #e2e8f0;border-radius:6px;\">{escape(label_text)}</pre>
+      </body>
+    </html>
+    """
+    attachment = {
+        "filename": f"shipping-label-{order_number}.txt",
+        "content": base64.b64encode(label_text.encode('utf-8')).decode('ascii'),
+        "content_type": "text/plain"
+    }
+    return send_email(
+        BUSINESS_EMAIL,
+        f"Shipping Label Fallback - {order_number}",
+        html_body,
+        order_number,
+        attachments=[attachment]
+    )
+
+def process_shipping_label_after_payment(order):
+    """Generate and print shipping label after payment confirmation."""
+    if order.get('shippingLabelPrintedAt'):
+        return True, "Shipping label already printed"
+
+    label_text = build_shipping_label_text(order)
+    printed, print_error = send_shipping_label_to_printnode(order, label_text)
+
+    if printed:
+        order['shippingLabelStatus'] = 'printed'
+        order['shippingLabelPrintedAt'] = datetime.now().isoformat()
+        order['shippingLabelError'] = ''
+        return True, "Shipping label auto-printed"
+
+    order['shippingLabelStatus'] = 'print_failed'
+    order['shippingLabelError'] = print_error
+    order['shippingLabelLastAttemptAt'] = datetime.now().isoformat()
+
+    if AUTO_PRINT_LABELS:
+        send_shipping_label_fallback_email(order, label_text, print_error)
+
+    return False, print_error
+
 # ==================== ADMIN ENDPOINTS ====================
 
 def verify_token(token):
@@ -1301,6 +1434,8 @@ def confirm_payment():
         
         # Mark payment as confirmed
         order['paymentConfirmed'] = True
+
+        label_printed, label_message = process_shipping_label_after_payment(order)
         save_orders_data(orders)
         
         # Send payment confirmation email to customer
@@ -1418,7 +1553,12 @@ def confirm_payment():
             }), 502
         
         print(f"✓ Payment confirmation email sent for order {order_number}")
-        return jsonify({'success': True, 'message': 'Payment confirmed and email sent to customer'}), 200
+        return jsonify({
+            'success': True,
+            'message': 'Payment confirmed and email sent to customer',
+            'labelPrinted': label_printed,
+            'labelMessage': label_message
+        }), 200
     except Exception as e:
         import traceback
         print(f"ERROR: {str(e)}")
