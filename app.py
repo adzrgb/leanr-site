@@ -1315,9 +1315,9 @@ def send_sendcloud_label_fallback_email(order, reason, label_url="", label_pdf_b
         attachments=attachments
     )
 
-def process_shipping_label_after_payment(order):
+def process_shipping_label_after_payment(order, force_reprint=False):
     """Generate and print shipping label after payment confirmation."""
-    if order.get('shippingLabelPrintedAt'):
+    if order.get('shippingLabelPrintedAt') and not force_reprint:
         return True, "Shipping label already printed"
 
     if SENDCLOUD_ENABLED and not AUTO_PRINT_LABELS:
@@ -1380,6 +1380,32 @@ def process_shipping_label_after_payment(order):
         send_shipping_label_fallback_email(order, label_text, print_error)
 
     return False, print_error
+
+def reprint_shipping_label_for_order(order):
+    """Reprint an order label, preferring existing carrier label URL when available."""
+    if not order.get('paymentConfirmed'):
+        return False, "Payment must be confirmed before printing a label"
+
+    if not AUTO_PRINT_LABELS:
+        return False, "AUTO_PRINT_LABELS is disabled"
+
+    existing_label_url = str(order.get('shippingLabelUrl') or '').strip()
+    if existing_label_url:
+        downloaded, download_error, pdf_bytes = _download_sendcloud_label_pdf(existing_label_url)
+        if downloaded:
+            printed, print_error = send_pdf_label_to_printnode(order, pdf_bytes, 'Royal Mail Tracked 24 Reprint')
+            if printed:
+                order['shippingLabelStatus'] = 'reprinted'
+                order['shippingLabelReprintedAt'] = datetime.now().isoformat()
+                order['shippingLabelError'] = ''
+                return True, "Existing Sendcloud label reprinted"
+            order['shippingLabelStatus'] = 'print_failed'
+            order['shippingLabelError'] = print_error
+            order['shippingLabelLastAttemptAt'] = datetime.now().isoformat()
+            return False, print_error
+
+    # No reusable URL available; regenerate through the standard pipeline.
+    return process_shipping_label_after_payment(order, force_reprint=True)
 
 def verify_printnode_printer():
     """Check that configured PrintNode printer exists and is reachable."""
@@ -1481,6 +1507,52 @@ def test_shipping_label_setup():
             'checks': checks,
             'printTest': print_test,
             'timestamp': datetime.now().isoformat()
+        }), 200
+    except Exception as e:
+        import traceback
+        print(f"ERROR: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/reprint-label', methods=['POST', 'OPTIONS'])
+def admin_reprint_label():
+    """Reprint shipping label for a paid order."""
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        token = auth_header.replace('Bearer ', '')
+        if not verify_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+
+        data = request.json or {}
+        order_number = data.get('orderNumber')
+        if not order_number:
+            return jsonify({'error': 'Order number is required'}), 400
+
+        orders = load_orders_data()
+        order = next((o for o in orders if o.get('orderNumber') == order_number), None)
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+
+        printed, message = reprint_shipping_label_for_order(order)
+        save_orders_data(orders)
+
+        if not printed:
+            return jsonify({
+                'success': False,
+                'labelPrinted': False,
+                'message': message
+            }), 400
+
+        return jsonify({
+            'success': True,
+            'labelPrinted': True,
+            'message': message
         }), 200
     except Exception as e:
         import traceback

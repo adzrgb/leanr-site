@@ -386,6 +386,26 @@
       cursor: not-allowed;
     }
 
+    .reprint-label-btn {
+      background: #334155;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .reprint-label-btn:hover {
+      background: #1e293b;
+    }
+
+    .reprint-label-btn:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+    }
+
     .test-label-btn {
       background: #0f766e;
       color: white;
@@ -681,6 +701,9 @@
               </span>
               <button class="confirm-payment-btn" onclick="confirmPayment('${order.orderNumber}', this)" ${order.paymentConfirmed ? 'disabled' : ''}>
                 Confirm Payment
+              </button>
+              <button class="reprint-label-btn" onclick="reprintLabel('${order.orderNumber}', this)" ${order.paymentConfirmed ? '' : 'disabled'}>
+                Reprint Label
               </button>
             </div>
           </div>
@@ -1070,6 +1093,46 @@
       } finally {
         trigger.disabled = false;
         trigger.textContent = 'Test Auto Label Setup';
+      }
+    }
+
+    async function reprintLabel(orderNumber, button) {
+      const token = localStorage.getItem('admin_token');
+      const msg = document.getElementById('orders-message');
+
+      if (!token) {
+        logout();
+        return;
+      }
+
+      button.disabled = true;
+      const originalText = button.textContent;
+      button.textContent = 'Printing...';
+
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/reprint-label', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ orderNumber })
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.message || data.error || 'Failed to reprint label');
+        }
+
+        msg.className = 'message success';
+        msg.textContent = `✓ ${data.message}`;
+        setTimeout(() => msg.className = 'message', 5000);
+      } catch (error) {
+        msg.className = 'message error';
+        msg.textContent = `✗ ${error.message}`;
+      } finally {
+        button.disabled = false;
+        button.textContent = originalText;
       }
     }
 
