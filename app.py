@@ -51,6 +51,12 @@ SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
 AUTO_PRINT_LABELS = os.getenv("AUTO_PRINT_LABELS", "false").lower() == "true"
 PRINTNODE_API_KEY = os.getenv("PRINTNODE_API_KEY", "")
 PRINTNODE_PRINTER_ID = os.getenv("PRINTNODE_PRINTER_ID", "")
+SENDCLOUD_ENABLED = os.getenv("SENDCLOUD_ENABLED", "false").lower() == "true"
+SENDCLOUD_PUBLIC_KEY = os.getenv("SENDCLOUD_PUBLIC_KEY", "")
+SENDCLOUD_SECRET_KEY = os.getenv("SENDCLOUD_SECRET_KEY", "")
+SENDCLOUD_BASE_URL = os.getenv("SENDCLOUD_BASE_URL", "https://panel.sendcloud.sc/api/v2").rstrip("/")
+SENDCLOUD_SHIPPING_METHOD_ID = os.getenv("SENDCLOUD_SHIPPING_METHOD_ID", "")
+SENDCLOUD_DEFAULT_COUNTRY = os.getenv("SENDCLOUD_DEFAULT_COUNTRY", "GB")
 
 print(f"DEBUG: EMAIL CONFIG - Business email: {BUSINESS_EMAIL}", flush=True)
 print(f"DEBUG: Resend API key present: {'Yes' if RESEND_API_KEY else 'No - emails will not send'}", flush=True)
@@ -62,6 +68,8 @@ print(f"DEBUG: SMTP fallback configured: {'Yes' if SMTP_PASSWORD else 'No'}", fl
 print(f"DEBUG: Email provider priority: Resend, then Brevo, then SMTP, then queue", flush=True)
 print(f"DEBUG: Auto print labels enabled: {'Yes' if AUTO_PRINT_LABELS else 'No'}", flush=True)
 print(f"DEBUG: PrintNode configured: {'Yes' if PRINTNODE_API_KEY and PRINTNODE_PRINTER_ID else 'No'}", flush=True)
+print(f"DEBUG: Sendcloud enabled: {'Yes' if SENDCLOUD_ENABLED else 'No'}", flush=True)
+print(f"DEBUG: Sendcloud configured: {'Yes' if SENDCLOUD_PUBLIC_KEY and SENDCLOUD_SECRET_KEY and SENDCLOUD_SHIPPING_METHOD_ID else 'No'}", flush=True)
 
 # Optional Supabase state storage (orders/stock/newsletter/queue).
 # Email confirmation logic stays unchanged; only persistence backend changes.
@@ -949,6 +957,147 @@ def parse_data_url_attachment(data_url, default_name="qr-photo"):
         "content_type": mime_type
     }
 
+def _split_address_for_sendcloud(address_line):
+    """Best-effort split of UK address line into street and house number."""
+    raw = str(address_line or "").strip()
+    if not raw:
+        return "Unknown Street", "1"
+
+    parts = raw.split()
+    if parts and any(ch.isdigit() for ch in parts[0]):
+        house_number = parts[0]
+        street = " ".join(parts[1:]) or raw
+        return street[:120], house_number[:24]
+
+    if parts and any(ch.isdigit() for ch in parts[-1]):
+        house_number = parts[-1]
+        street = " ".join(parts[:-1]) or raw
+        return street[:120], house_number[:24]
+
+    return raw[:120], "1"
+
+def _extract_sendcloud_label_url(parcel):
+    """Read Sendcloud parcel payload and extract a downloadable label URL."""
+    if not isinstance(parcel, dict):
+        return ""
+
+    direct_keys = [
+        'label_url',
+        'label_download',
+        'label_printer',
+        'label',
+        'label_zpl_url'
+    ]
+    for key in direct_keys:
+        value = parcel.get(key)
+        if isinstance(value, str) and value.startswith('http'):
+            return value
+
+    label_obj = parcel.get('label')
+    if isinstance(label_obj, dict):
+        nested_keys = ['normal', 'printer', 'label_printer', 'label']
+        for key in nested_keys:
+            value = label_obj.get(key)
+            if isinstance(value, str) and value.startswith('http'):
+                return value
+
+    return ""
+
+def _download_sendcloud_label_pdf(label_url):
+    """Download label bytes from Sendcloud label URL."""
+    if not label_url:
+        return False, "Missing Sendcloud label URL", b""
+
+    try:
+        response = requests.get(
+            label_url,
+            auth=(SENDCLOUD_PUBLIC_KEY, SENDCLOUD_SECRET_KEY),
+            timeout=20
+        )
+        if response.status_code != 200:
+            return False, f"Sendcloud label download failed: {response.status_code}", b""
+
+        content = response.content or b""
+        if not content:
+            return False, "Sendcloud label download returned empty content", b""
+
+        return True, "", content
+    except Exception as e:
+        return False, f"Sendcloud label download exception: {str(e)}", b""
+
+def create_sendcloud_tracked24_label(order):
+    """Create a Sendcloud parcel and request a carrier label."""
+    if not SENDCLOUD_ENABLED:
+        return False, "SENDCLOUD_ENABLED is disabled", {}
+
+    if not SENDCLOUD_PUBLIC_KEY or not SENDCLOUD_SECRET_KEY:
+        return False, "Sendcloud API keys are missing", {}
+
+    if not SENDCLOUD_SHIPPING_METHOD_ID:
+        return False, "SENDCLOUD_SHIPPING_METHOD_ID is missing", {}
+
+    try:
+        shipping_method_id = int(SENDCLOUD_SHIPPING_METHOD_ID)
+    except (TypeError, ValueError):
+        return False, "SENDCLOUD_SHIPPING_METHOD_ID must be a number", {}
+
+    street, house_number = _split_address_for_sendcloud(order.get('deliveryAddress', ''))
+
+    parcel_payload = {
+        'name': str(order.get('customerName') or 'Customer')[:120],
+        'address': street,
+        'house_number': house_number,
+        'city': str(order.get('city') or '')[:120],
+        'postal_code': str(order.get('postcode') or '')[:32],
+        'country': SENDCLOUD_DEFAULT_COUNTRY,
+        'telephone': str(order.get('customerPhone') or '')[:32],
+        'email': str(order.get('customerEmail') or '')[:255],
+        'order_number': str(order.get('orderNumber') or ''),
+        'request_label': True,
+        'shipment': {
+            'id': shipping_method_id
+        },
+        'weight': '0.5',
+        'apply_shipping_rules': False
+    }
+
+    try:
+        response = requests.post(
+            f"{SENDCLOUD_BASE_URL}/parcels",
+            auth=(SENDCLOUD_PUBLIC_KEY, SENDCLOUD_SECRET_KEY),
+            json={'parcel': parcel_payload},
+            timeout=20
+        )
+        if response.status_code not in (200, 201):
+            return False, f"Sendcloud parcel creation failed: {response.status_code} - {response.text}", {}
+
+        payload = response.json() if response.content else {}
+        parcel = payload.get('parcel', payload)
+        label_url = _extract_sendcloud_label_url(parcel)
+        if not label_url:
+            return False, "Sendcloud parcel created but no label URL returned", {
+                'parcelId': parcel.get('id'),
+                'trackingNumber': parcel.get('tracking_number') or ''
+            }
+
+        downloaded, download_error, pdf_bytes = _download_sendcloud_label_pdf(label_url)
+        if not downloaded:
+            return False, download_error, {
+                'parcelId': parcel.get('id'),
+                'trackingNumber': parcel.get('tracking_number') or '',
+                'labelUrl': label_url
+            }
+
+        return True, "", {
+            'parcelId': parcel.get('id'),
+            'trackingNumber': parcel.get('tracking_number') or '',
+            'trackingUrl': parcel.get('tracking_url') or '',
+            'labelUrl': label_url,
+            'labelPdfBytes': pdf_bytes
+        }
+    except Exception as e:
+        return False, f"Sendcloud request failed: {str(e)}", {}
+
 def build_shipping_label_text(order):
     """Build a printable shipping label body for an order."""
     order_number = order.get('orderNumber', 'UNKNOWN')
@@ -993,7 +1142,7 @@ def build_shipping_label_text(order):
     )
 
 def send_shipping_label_to_printnode(order, label_text):
-    """Send a raw text label to PrintNode. Returns (ok, error_message)."""
+    """Send a raw text fallback label to PrintNode. Returns (ok, error_message)."""
     if not AUTO_PRINT_LABELS:
         return False, "AUTO_PRINT_LABELS is disabled"
 
@@ -1026,6 +1175,40 @@ def send_shipping_label_to_printnode(order, label_text):
     except Exception as e:
         return False, f"PrintNode request failed: {str(e)}"
 
+def send_pdf_label_to_printnode(order, pdf_bytes, label_title):
+    """Send PDF label to PrintNode. Returns (ok, error_message)."""
+    if not AUTO_PRINT_LABELS:
+        return False, "AUTO_PRINT_LABELS is disabled"
+
+    if not PRINTNODE_API_KEY or not PRINTNODE_PRINTER_ID:
+        return False, "PrintNode credentials are missing"
+
+    try:
+        printer_id = int(PRINTNODE_PRINTER_ID)
+    except (TypeError, ValueError):
+        return False, "PRINTNODE_PRINTER_ID must be a number"
+
+    try:
+        payload = {
+            "printerId": printer_id,
+            "title": f"{label_title} - {order.get('orderNumber', 'UNKNOWN')}",
+            "contentType": "pdf_base64",
+            "content": base64.b64encode(pdf_bytes).decode('ascii'),
+            "source": "LEANr Sendcloud Label"
+        }
+        response = requests.post(
+            "https://api.printnode.com/printjobs",
+            auth=(PRINTNODE_API_KEY, ""),
+            json=payload,
+            timeout=20
+        )
+        if response.status_code in (200, 201):
+            return True, ""
+
+        return False, f"PrintNode error: {response.status_code} - {response.text}"
+    except Exception as e:
+        return False, f"PrintNode PDF request failed: {str(e)}"
+
 def send_shipping_label_fallback_email(order, label_text, reason):
     """Fallback path if auto-print is enabled but the print job fails."""
     order_number = order.get('orderNumber', 'UNKNOWN')
@@ -1053,10 +1236,85 @@ def send_shipping_label_fallback_email(order, label_text, reason):
         attachments=[attachment]
     )
 
+def send_sendcloud_label_fallback_email(order, reason, label_url="", label_pdf_bytes=None):
+    """Email fallback details if Sendcloud label generation or print fails."""
+    order_number = order.get('orderNumber', 'UNKNOWN')
+    label_link = f"<p><strong>Label URL:</strong> <a href=\"{escape(label_url)}\">{escape(label_url)}</a></p>" if label_url else ""
+    html_body = f"""
+    <html>
+      <body style=\"font-family: Arial, sans-serif; color: #1f2937;\">
+        <h2>Sendcloud Label Fallback - {order_number}</h2>
+        <p>Automatic Sendcloud label printing failed after payment confirmation.</p>
+        <p><strong>Reason:</strong> {escape(reason)}</p>
+        {label_link}
+        <p>Please print the attached label manually if present.</p>
+      </body>
+    </html>
+    """
+
+    attachments = []
+    if label_pdf_bytes:
+        attachments.append({
+            "filename": f"sendcloud-label-{order_number}.pdf",
+            "content": base64.b64encode(label_pdf_bytes).decode('ascii'),
+            "content_type": "application/pdf"
+        })
+
+    return send_email(
+        BUSINESS_EMAIL,
+        f"Sendcloud Label Fallback - {order_number}",
+        html_body,
+        order_number,
+        attachments=attachments
+    )
+
 def process_shipping_label_after_payment(order):
     """Generate and print shipping label after payment confirmation."""
     if order.get('shippingLabelPrintedAt'):
         return True, "Shipping label already printed"
+
+    if SENDCLOUD_ENABLED and not AUTO_PRINT_LABELS:
+        order['shippingLabelStatus'] = 'skipped'
+        order['shippingLabelError'] = 'AUTO_PRINT_LABELS is disabled'
+        order['shippingLabelLastAttemptAt'] = datetime.now().isoformat()
+        return False, 'AUTO_PRINT_LABELS is disabled'
+
+    if SENDCLOUD_ENABLED and AUTO_PRINT_LABELS:
+        created, carrier_message, carrier_data = create_sendcloud_tracked24_label(order)
+
+        if created:
+            order['shippingCarrier'] = 'sendcloud'
+            order['sendcloudParcelId'] = carrier_data.get('parcelId')
+            order['shippingLabelUrl'] = carrier_data.get('labelUrl', '')
+            order['shippingTrackingNumber'] = carrier_data.get('trackingNumber', '')
+            order['shippingTrackingUrl'] = carrier_data.get('trackingUrl', '')
+
+            label_pdf_bytes = carrier_data.get('labelPdfBytes', b"")
+            printed, print_error = send_pdf_label_to_printnode(order, label_pdf_bytes, 'Royal Mail Tracked 24')
+            if printed:
+                order['shippingLabelStatus'] = 'printed'
+                order['shippingLabelPrintedAt'] = datetime.now().isoformat()
+                order['shippingLabelError'] = ''
+                return True, "Sendcloud Tracked 24 label auto-printed"
+
+            order['shippingLabelStatus'] = 'print_failed'
+            order['shippingLabelError'] = print_error
+            order['shippingLabelLastAttemptAt'] = datetime.now().isoformat()
+            if AUTO_PRINT_LABELS:
+                send_sendcloud_label_fallback_email(
+                    order,
+                    print_error,
+                    label_url=carrier_data.get('labelUrl', ''),
+                    label_pdf_bytes=label_pdf_bytes
+                )
+            return False, print_error
+
+        order['shippingLabelStatus'] = 'carrier_failed'
+        order['shippingLabelError'] = carrier_message
+        order['shippingLabelLastAttemptAt'] = datetime.now().isoformat()
+        if AUTO_PRINT_LABELS:
+            send_sendcloud_label_fallback_email(order, carrier_message, label_url=carrier_data.get('labelUrl', ''))
+        return False, carrier_message
 
     label_text = build_shipping_label_text(order)
     printed, print_error = send_shipping_label_to_printnode(order, label_text)
