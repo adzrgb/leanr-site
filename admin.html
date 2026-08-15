@@ -385,6 +385,23 @@
       background: #cbd5e1;
       cursor: not-allowed;
     }
+
+    .test-label-btn {
+      background: #0f766e;
+      color: white;
+      border: none;
+      padding: 0.5rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-left: 0.75rem;
+    }
+
+    .test-label-btn:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
     
     /* Mobile / iPhone Responsive Styles */
     @media (max-width: 768px) {
@@ -507,7 +524,10 @@
     
     <!-- Orders Tab -->
     <div id="orders" class="tab-content active">
-      <h2>Customer Orders</h2>
+      <h2>
+        Customer Orders
+        <button id="test-shipping-btn" class="test-label-btn" onclick="runShippingLabelTest(this)">Test Auto Label Setup</button>
+      </h2>
       <div id="orders-message" class="message"></div>
       <div id="orders-list" class="orders-list">
         <div class="empty-state">Loading orders...</div>
@@ -1009,6 +1029,47 @@
         alert('Error: ' + error.message);
         button.disabled = false;
         button.textContent = 'Confirm Payment';
+      }
+    }
+
+    async function runShippingLabelTest(button) {
+      const token = localStorage.getItem('admin_token');
+      const msg = document.getElementById('orders-message');
+      const trigger = button || document.getElementById('test-shipping-btn');
+
+      if (!token) {
+        logout();
+        return;
+      }
+
+      trigger.disabled = true;
+      trigger.textContent = 'Testing...';
+
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/test-shipping-label', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ printTest: true })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to run shipping label diagnostics');
+        }
+
+        const checks = Array.isArray(data.checks) ? data.checks : [];
+        const summary = checks.map(check => `${check.ok ? '✓' : '✗'} ${check.check}: ${check.detail}`).join(' | ');
+        msg.className = data.success ? 'message success' : 'message error';
+        msg.textContent = summary || 'No diagnostics were returned.';
+      } catch (error) {
+        msg.className = 'message error';
+        msg.textContent = `✗ ${error.message}`;
+      } finally {
+        trigger.disabled = false;
+        trigger.textContent = 'Test Auto Label Setup';
       }
     }
 

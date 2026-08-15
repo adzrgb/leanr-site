@@ -1381,11 +1381,112 @@ def process_shipping_label_after_payment(order):
 
     return False, print_error
 
+def verify_printnode_printer():
+    """Check that configured PrintNode printer exists and is reachable."""
+    if not PRINTNODE_API_KEY or not PRINTNODE_PRINTER_ID:
+        return False, "PrintNode credentials are missing"
+
+    try:
+        printer_id = int(PRINTNODE_PRINTER_ID)
+    except (TypeError, ValueError):
+        return False, "PRINTNODE_PRINTER_ID must be a number"
+
+    try:
+        response = requests.get(
+            "https://api.printnode.com/printers",
+            auth=(PRINTNODE_API_KEY, ""),
+            timeout=15
+        )
+        if response.status_code != 200:
+            return False, f"PrintNode printer lookup failed: {response.status_code}"
+
+        printers = response.json() if response.content else []
+        if not isinstance(printers, list):
+            return False, "PrintNode returned unexpected printer payload"
+
+        found = any(int(p.get('id', -1)) == printer_id for p in printers if isinstance(p, dict))
+        if not found:
+            return False, f"Configured printer ID {printer_id} was not found in PrintNode account"
+
+        return True, "PrintNode printer is reachable"
+    except Exception as e:
+        return False, f"PrintNode printer lookup exception: {str(e)}"
+
 # ==================== ADMIN ENDPOINTS ====================
 
 def verify_token(token):
     """Verify admin token"""
     return token in ADMIN_TOKENS
+
+@app.route('/api/admin/test-shipping-label', methods=['POST', 'OPTIONS'])
+def test_shipping_label_setup():
+    """Run a dry-run diagnostics test for Sendcloud + PrintNode setup."""
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        token = auth_header.replace('Bearer ', '')
+        if not verify_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+
+        data = request.json or {}
+        print_test = bool(data.get('printTest', True))
+
+        checks = []
+
+        def add_check(name, ok, detail):
+            checks.append({'check': name, 'ok': bool(ok), 'detail': str(detail)})
+
+        add_check('AUTO_PRINT_LABELS', AUTO_PRINT_LABELS, 'AUTO_PRINT_LABELS must be true for automatic label printing')
+        add_check('SENDCLOUD_ENABLED', SENDCLOUD_ENABLED, 'SENDCLOUD_ENABLED must be true for carrier labels')
+
+        has_sendcloud_keys = bool(SENDCLOUD_PUBLIC_KEY and SENDCLOUD_SECRET_KEY)
+        add_check('Sendcloud API keys', has_sendcloud_keys, 'Set SENDCLOUD_PUBLIC_KEY and SENDCLOUD_SECRET_KEY')
+
+        has_printnode_keys = bool(PRINTNODE_API_KEY and PRINTNODE_PRINTER_ID)
+        add_check('PrintNode config', has_printnode_keys, 'Set PRINTNODE_API_KEY and PRINTNODE_PRINTER_ID')
+
+        if SENDCLOUD_ENABLED and has_sendcloud_keys:
+            resolved, method_id, method_error = resolve_sendcloud_shipping_method_id()
+            if resolved:
+                add_check('Sendcloud Tracked method', True, f"Resolved shipping method ID: {method_id}")
+            else:
+                add_check('Sendcloud Tracked method', False, method_error)
+
+        if has_printnode_keys:
+            printer_ok, printer_msg = verify_printnode_printer()
+            add_check('PrintNode printer', printer_ok, printer_msg)
+
+        if print_test and AUTO_PRINT_LABELS and has_printnode_keys:
+            test_order = {
+                'orderNumber': f"TEST-{int(time.time())}",
+                'customerName': 'Label Test',
+                'deliveryAddress': '123 Test Street',
+                'city': 'London',
+                'postcode': 'SW1A 1AA',
+                'customerPhone': '00000000000',
+                'items': [{'name': 'Test Item', 'option': 'Diagnostics', 'quantity': 1}]
+            }
+            test_label_text = build_shipping_label_text(test_order) + "\nDIAGNOSTIC TEST PRINT ONLY\n"
+            printed, print_error = send_shipping_label_to_printnode(test_order, test_label_text)
+            add_check('PrintNode test print', printed, 'Test page sent to printer' if printed else print_error)
+
+        success = all(check.get('ok') for check in checks)
+        return jsonify({
+            'success': success,
+            'checks': checks,
+            'printTest': print_test,
+            'timestamp': datetime.now().isoformat()
+        }), 200
+    except Exception as e:
+        import traceback
+        print(f"ERROR: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/email-queue', methods=['GET', 'OPTIONS'])
 def get_email_queue():
