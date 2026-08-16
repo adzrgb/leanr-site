@@ -69,9 +69,12 @@ function applyDiscountUiState() {
     discountApplied = false;
     appliedDiscountCode = null;
     appliedDiscountPercent = 0;
-    if (discountSection) discountSection.style.display = 'none';
     if (discountRow) discountRow.style.display = 'none';
-    if (discountMessage) discountMessage.textContent = '';
+    if (discountSection) discountSection.style.display = 'block';
+    if (discountMessage) {
+      discountMessage.textContent = 'Discount codes are currently unavailable';
+      discountMessage.style.color = '#6b7280';
+    }
     return;
   }
 

@@ -1932,6 +1932,111 @@ def send_tracking():
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/admin/payment-reminder', methods=['POST', 'OPTIONS'])
+def send_payment_reminder():
+    """Send a payment reminder without changing the order payment status."""
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    try:
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Unauthorized'}), 401
+
+        token = auth_header.replace('Bearer ', '')
+        if not verify_token(token):
+            return jsonify({'error': 'Invalid token'}), 401
+
+        data = request.json or {}
+        order_number = data.get('orderNumber')
+        if not order_number:
+            return jsonify({'error': 'Order number is required'}), 400
+
+        orders = load_orders_data()
+        order = next((o for o in orders if o.get('orderNumber') == order_number), None)
+        if not order:
+            return jsonify({'error': 'Order not found'}), 404
+
+        customer_email = order.get('customerEmail') or order.get('email')
+        if not customer_email:
+            return jsonify({'error': 'Customer email not found for this order'}), 400
+
+        item_rows = ''.join(
+            f"<tr><td style='padding: 8px; border-bottom: 1px solid #e2e8f0;'>{item.get('name', 'Item')} ({item.get('option', 'N/A')})</td>"
+            f"<td style='padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: center;'>{item.get('quantity', 0)}</td>"
+            f"<td style='padding: 8px; border-bottom: 1px solid #e2e8f0; text-align: right;'>£{float(item.get('price', 0)) * int(item.get('quantity', 0)):.2f}</td></tr>"
+            for item in order.get('items', [])
+        )
+        discount_amount = float(order.get('discountAmount', 0) or 0)
+        subtotal = float(order.get('subtotal', 0) or 0)
+        postage = float(order.get('postage', 0) or 0)
+        total = float(order.get('total', subtotal) or subtotal)
+        discount_row = (
+            f"<p style='color: #10b981;'><strong>Discount:</strong> -£{discount_amount:.2f}</p>"
+            if discount_amount > 0 else ''
+        )
+
+        payment_reminder_body = f"""
+        <html>
+            <head>
+                <style>
+                    body {{ font-family: Arial, sans-serif; color: #333; }}
+                    .header {{ background: linear-gradient(135deg, #0052cc, #ec4899); color: white; padding: 20px; text-align: center; }}
+                    .content {{ padding: 20px; }}
+                    .payment-section {{ background: #fffbeb; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ec4899; }}
+                    table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+                    th {{ background: #f1f5f9; padding: 8px; text-align: left; }}
+                </style>
+            </head>
+            <body>
+                <div class="header"><h1>Payment Reminder</h1></div>
+                <div class="content">
+                    <p>Hi {order.get('customerName', 'there')},</p>
+                    <p>This is a friendly reminder that payment is still outstanding for your LEANr order.</p>
+                    <h2>Order Number: {order_number}</h2>
+                    <table>
+                        <tr><th>Product</th><th>Qty</th><th>Total</th></tr>
+                        {item_rows}
+                    </table>
+                    <div style="text-align: right; margin: 20px 0;">
+                        <p><strong>Subtotal:</strong> £{subtotal:.2f}</p>
+                        {discount_row}
+                        <p><strong>Postage:</strong> £{postage:.2f}</p>
+                        <p style="font-size: 1.2em;"><strong>Amount due: £{total:.2f}</strong></p>
+                    </div>
+                    <div class="payment-section">
+                        <h3>Payment Details</h3>
+                        <p><strong>PayPal</strong><br>ellaclegg232@gmail.com</p>
+                        <p><strong>Bank Transfer</strong><br>Sort code: 23-01-20<br>Account number: 13050648<br>Reference: {order_number[-4:]}</p>
+                        <p><em>Please use the name A W when making the transfer. Don't worry if the name does not match your bank — this is normal.</em></p>
+                    </div>
+                    <p>Please reply to this email if you have already paid or need any help.</p>
+                    <p>Thank you,<br>The LEANr Team</p>
+                </div>
+            </body>
+        </html>
+        """
+
+        sent, send_error = send_email(
+            customer_email,
+            f"Payment Reminder - Order {order_number}",
+            payment_reminder_body,
+            order_number
+        )
+        if not sent:
+            return jsonify({
+                'error': 'Payment reminder could not be delivered immediately',
+                'details': send_error
+            }), 502
+
+        print(f"✓ Payment reminder sent for order {order_number}")
+        return jsonify({'success': True, 'message': 'Payment reminder sent to customer'}), 200
+    except Exception as e:
+        import traceback
+        print(f"ERROR: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/admin/confirm-payment', methods=['POST', 'OPTIONS'])
 def confirm_payment():
     """Confirm payment and send confirmation email to customer"""

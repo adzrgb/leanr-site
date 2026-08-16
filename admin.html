@@ -440,6 +440,26 @@
       cursor: not-allowed;
     }
 
+    .payment-reminder-btn {
+      background: #f59e0b;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .payment-reminder-btn:hover {
+      background: #d97706;
+    }
+
+    .payment-reminder-btn:disabled {
+      background: #cbd5e1;
+      cursor: not-allowed;
+    }
+
     .reprint-label-btn {
       background: #334155;
       color: white;
@@ -779,6 +799,9 @@
               </span>
               <button class="confirm-payment-btn" onclick="confirmPayment('${order.orderNumber}', this)" ${order.paymentConfirmed ? 'disabled' : ''}>
                 Confirm Payment
+              </button>
+              <button class="payment-reminder-btn" onclick="sendPaymentReminder('${order.orderNumber}', this)" ${order.paymentConfirmed ? 'disabled' : ''}>
+                Send Payment Reminder
               </button>
               <button class="reprint-label-btn" onclick="reprintLabel('${order.orderNumber}', this)" ${order.paymentConfirmed ? '' : 'disabled'}>
                 Reprint Label
@@ -1244,6 +1267,37 @@
       }
     }
     
+    async function sendPaymentReminder(orderNumber, button) {
+      if (!confirm('Send a payment reminder email to this customer?')) return;
+
+      const token = localStorage.getItem('admin_token');
+      button.disabled = true;
+      button.textContent = 'Sending...';
+
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/payment-reminder', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ orderNumber })
+        });
+
+        const data = await response.json();
+        const msg = document.getElementById('orders-message');
+        if (!response.ok) throw new Error(data.error || 'Failed to send payment reminder');
+
+        msg.className = 'message success';
+        msg.textContent = 'Payment reminder sent to customer.';
+        setTimeout(() => msg.className = 'message', 4000);
+      } catch (error) {
+        alert('Error: ' + error.message);
+        button.disabled = false;
+        button.textContent = 'Send Payment Reminder';
+      }
+    }
+
     async function confirmPayment(orderNumber, button) {
       const checkbox = document.getElementById(`payment-${orderNumber}`);
       
