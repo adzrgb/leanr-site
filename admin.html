@@ -765,6 +765,11 @@
           const bTime = new Date(b.timestamp || 0).getTime();
           return bTime - aTime;
         });
+
+        const trackingDrafts = {};
+        ordersList.querySelectorAll('.tracking-input').forEach(input => {
+          trackingDrafts[input.dataset.orderNumber] = input.value;
+        });
         
         ordersList.innerHTML = sortedOrders.map(order => `
           <div class="order-card">
@@ -787,7 +792,7 @@
               <div style="margin-top: 0.5rem; font-weight: 600;">Total: £${order.total.toFixed(2)}</div>
             </div>
             <div class="tracking-section">
-              <input type="text" class="tracking-input" data-order-number="${order.orderNumber}" placeholder="Enter tracking number..." value="${order.trackingNumber || ''}">
+              <input type="text" class="tracking-input" data-order-number="${order.orderNumber}" placeholder="Enter tracking number..." value="${trackingDrafts[order.orderNumber] ?? order.trackingNumber ?? ''}">
               <button class="send-tracking-btn" onclick="sendTracking('${order.orderNumber}', this)">
                 ${order.trackingNumber ? 'Resend' : 'Send'} Tracking
               </button>
