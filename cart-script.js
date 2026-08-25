@@ -83,7 +83,14 @@ function applyDiscountUiState() {
     return;
   }
 
-  if (discountSection) discountSection.style.display = 'block';
+  discountApplied = true;
+  appliedDiscountCode = discountConfig.code;
+  appliedDiscountPercent = discountConfig.percent;
+  if (discountSection) discountSection.style.display = 'none';
+  if (discountMessage) {
+    discountMessage.textContent = `${discountConfig.percent}% bank holiday discount applied automatically`;
+    discountMessage.style.color = '#10b981';
+  }
 }
 
 function initDiscountSettings() {
