@@ -499,6 +499,25 @@ main {
   display: none !important;
 }
 
+.product-price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.product-price-old {
+  color: #64748b;
+  text-decoration: line-through;
+  text-decoration-color: #dc2626;
+  text-decoration-thickness: 2px;
+}
+
+.product-price-sale {
+  color: #dc2626;
+  font-weight: 800;
+}
+
 .product-image {
   display: block;
   width: 100%;

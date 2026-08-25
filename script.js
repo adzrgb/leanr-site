@@ -1,4 +1,5 @@
 let cart = JSON.parse(localStorage.getItem('leanr-cart')) || [];
+let salePricing = { enabled: false, percent: 15 };
 
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -6,8 +7,39 @@ document.addEventListener('DOMContentLoaded', () => {
   initProductVisibility();
   initStockStatus();
   initDiscountPopup();
+  initSalePricing();
   initCookieConsent();
 });
+
+function updateSalePriceDisplay(element, basePrice) {
+  if (!element) return;
+  const numericPrice = Number(basePrice);
+  if (!Number.isFinite(numericPrice)) return;
+  element.dataset.price = numericPrice;
+
+  if (salePricing.enabled) {
+    const salePrice = numericPrice * (1 - salePricing.percent / 100);
+    element.innerHTML = `<span class="product-price-old">£${numericPrice.toFixed(2)}</span><span class="product-price-sale">£${salePrice.toFixed(2)}</span>`;
+  } else {
+    element.textContent = `£${numericPrice}`;
+  }
+}
+
+function initSalePricing() {
+  fetch(window.location.origin + '/api/public/discount-settings')
+    .then(res => res.json())
+    .then(data => {
+      const discount = data.discount || {};
+      salePricing = {
+        enabled: !!discount.enabled,
+        percent: Number.isFinite(Number(discount.percent)) ? Number(discount.percent) : 15
+      };
+      document.querySelectorAll('.product-price').forEach(price => {
+        updateSalePriceDisplay(price, price.dataset.price);
+      });
+    })
+    .catch(() => {});
+}
 
 function initProductVisibility() {
   fetch(window.location.origin + '/api/public/product-visibility')
@@ -376,7 +408,7 @@ if (strengthSelect && priceDisplay) {
     const selectedValue = event.target.value;
     const selectedText = event.target.options[event.target.selectedIndex].text;
     const variantName = selectedText.split(' — ')[0].trim();
-    priceDisplay.textContent = `£${selectedValue}`;
+    updateSalePriceDisplay(priceDisplay, selectedValue);
     const addButton = document.querySelector('.featured-product .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
@@ -396,7 +428,7 @@ if (tirzeSelect && tirzePrice) {
     const selectedValue = event.target.value;
     const selectedText = event.target.options[event.target.selectedIndex].text;
     const variantName = selectedText.split(' — ')[0].trim();
-    tirzePrice.textContent = `£${selectedValue}`;
+    updateSalePriceDisplay(tirzePrice, selectedValue);
     const addButton = document.querySelector('[data-modal="modal-tirzepetide"] .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
@@ -416,7 +448,7 @@ if (mt1Select && mt1Price) {
     const selectedValue = event.target.value;
     const selectedText = event.target.options[event.target.selectedIndex].text;
     const variantName = selectedText.split(' — ')[0].trim();
-    mt1Price.textContent = `£${selectedValue}`;
+    updateSalePriceDisplay(mt1Price, selectedValue);
     const addButton = document.querySelector('[data-modal="modal-mt1"] .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
@@ -436,7 +468,7 @@ if (mt2Select && mt2Price) {
     const selectedValue = event.target.value;
     const selectedText = event.target.options[event.target.selectedIndex].text;
     const variantName = selectedText.split(' — ')[0].trim();
-    mt2Price.textContent = `£${selectedValue}`;
+    updateSalePriceDisplay(mt2Price, selectedValue);
     const addButton = document.querySelector('[data-modal="modal-mt2"] .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
@@ -456,7 +488,7 @@ if (ghkSelect && ghkPrice) {
     const selectedValue = event.target.value;
     const selectedText = event.target.options[event.target.selectedIndex].text;
     const variantName = selectedText.split(' — ')[0].trim();
-    ghkPrice.textContent = `£${selectedValue}`;
+    updateSalePriceDisplay(ghkPrice, selectedValue);
     const addButton = document.querySelector('[data-modal="modal-ghkcu"] .add-btn');
     if (addButton) {
       addButton.dataset.price = selectedValue;
