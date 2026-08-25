@@ -281,7 +281,8 @@ def get_discount_settings():
     if not isinstance(raw, dict):
         raw = {}
 
-    enabled = bool(raw.get('enabled', DEFAULT_DISCOUNT_SETTINGS['enabled']))
+    configured_enabled = bool(raw.get('enabled', DEFAULT_DISCOUNT_SETTINGS['enabled']))
+    enabled = configured_enabled
     code = str(raw.get('code', DEFAULT_DISCOUNT_SETTINGS['code'])).strip().upper() or DEFAULT_DISCOUNT_SETTINGS['code']
 
     try:
@@ -302,6 +303,7 @@ def get_discount_settings():
 
     return {
         'enabled': enabled,
+        'configured_enabled': configured_enabled,
         'code': code,
         'percent': percent,
         'starts_at': starts_at,

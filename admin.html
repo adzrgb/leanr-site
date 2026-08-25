@@ -1067,7 +1067,7 @@
         }
 
         const data = await response.json();
-        const enabled = !!data?.discount?.enabled;
+        const enabled = !!(data?.discount?.configured_enabled ?? data?.discount?.enabled);
         const toggle = document.getElementById('discount-enabled-toggle');
         const secretToggle = document.getElementById('secret-discount-enabled-toggle');
         if (toggle) {
@@ -1131,7 +1131,11 @@
       'MULTI BUY BUNDLE',
       'GHK-CU',
       'KLOW PEN',
-      'CAGRI'
+      'CAGRI',
+      'NAD+',
+      'MOTS-C',
+      'SELANK',
+      'SEMAX'
     ];
 
     async function loadProductVisibility() {
