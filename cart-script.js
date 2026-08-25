@@ -14,7 +14,7 @@ const SALE_GIFT_ITEMS = {
   ghkcu: { name: 'GHK-CU', option: 'Pen - Free bank holiday gift' }
 };
 const secretDiscountConfig = {
-  code: 'QUEENS',
+  code: 'QUEEN',
   percent: 10
 };
 

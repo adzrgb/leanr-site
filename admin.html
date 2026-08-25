@@ -674,6 +674,10 @@
           <label for="discount-enabled-toggle" style="font-weight: 600;">Enable 15% discount + popup</label>
           <input type="checkbox" id="discount-enabled-toggle" style="width: 20px; height: 20px;" />
         </div>
+        <div class="discount-toggle-row">
+          <label for="secret-discount-enabled-toggle" style="font-weight: 600;">Paige + Beth secret 10% code (QUEEN)</label>
+          <input type="checkbox" id="secret-discount-enabled-toggle" style="width: 20px; height: 20px;" />
+        </div>
         <button class="discount-save-btn" id="save-discount-btn" onclick="saveDiscountSettings()">Save Discount Setting</button>
       </div>
     </div>
@@ -1065,8 +1069,12 @@
         const data = await response.json();
         const enabled = !!data?.discount?.enabled;
         const toggle = document.getElementById('discount-enabled-toggle');
+        const secretToggle = document.getElementById('secret-discount-enabled-toggle');
         if (toggle) {
           toggle.checked = enabled;
+        }
+        if (secretToggle) {
+          secretToggle.checked = !!data?.discount?.secret_enabled;
         }
       } catch (error) {
         const msg = document.getElementById('discount-message');
@@ -1080,10 +1088,11 @@
     async function saveDiscountSettings() {
       const token = localStorage.getItem('admin_token');
       const toggle = document.getElementById('discount-enabled-toggle');
+      const secretToggle = document.getElementById('secret-discount-enabled-toggle');
       const button = document.getElementById('save-discount-btn');
       const msg = document.getElementById('discount-message');
 
-      if (!toggle || !button || !msg) return;
+      if (!toggle || !secretToggle || !button || !msg) return;
 
       button.disabled = true;
       button.textContent = 'Saving...';
@@ -1095,7 +1104,7 @@
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
           },
-          body: JSON.stringify({ enabled: toggle.checked })
+          body: JSON.stringify({ enabled: toggle.checked, secret_enabled: secretToggle.checked })
         });
 
         const data = await response.json();
@@ -1104,7 +1113,7 @@
         }
 
         msg.className = 'message success';
-        msg.textContent = `✓ Discount ${toggle.checked ? 'enabled' : 'disabled'} successfully`;
+        msg.textContent = '✓ Discount settings saved successfully';
       } catch (error) {
         msg.className = 'message error';
         msg.textContent = `✗ ${error.message}`;

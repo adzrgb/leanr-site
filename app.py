@@ -120,7 +120,8 @@ DEFAULT_DISCOUNT_SETTINGS = {
     "code": "BANKHOLIDAY15",
     "percent": 15,
     "starts_at": "2026-08-26T00:00:00",
-    "ends_at": "2026-09-01T00:00:00"
+    "ends_at": "2026-09-01T00:00:00",
+    "secret_enabled": False
 }
 
 DEFAULT_PRODUCT_VISIBILITY = {
@@ -138,7 +139,7 @@ DEFAULT_PRODUCT_VISIBILITY = {
     "SEMAX": True
 }
 
-SECRET_DISCOUNT_CODE = "QUEENS"
+SECRET_DISCOUNT_CODE = "QUEEN"
 SECRET_DISCOUNT_PERCENT = 10
 PAYPAL_FEE_PERCENT = 2.9
 SALE_GIFT_NAMES = {
@@ -304,7 +305,8 @@ def get_discount_settings():
         'code': code,
         'percent': percent,
         'starts_at': starts_at,
-        'ends_at': ends_at
+        'ends_at': ends_at,
+        'secret_enabled': bool(raw.get('secret_enabled', DEFAULT_DISCOUNT_SETTINGS['secret_enabled']))
     }
 
 def set_discount_enabled(enabled):
@@ -562,7 +564,7 @@ def send_order():
             submitted_discount = 0
 
         is_public_discount = discount_settings['enabled'] and (submitted_code == discount_settings['code'])
-        is_secret_discount = submitted_code == SECRET_DISCOUNT_CODE
+        is_secret_discount = discount_settings['secret_enabled'] and submitted_code == SECRET_DISCOUNT_CODE
 
         if not is_public_discount and not is_secret_discount:
             submitted_discount = 0
@@ -2389,7 +2391,8 @@ def get_public_discount_settings():
     """Public discount settings used by checkout and site popup."""
     try:
         settings = get_discount_settings()
-        return jsonify({'discount': settings}), 200
+        public_settings = {key: settings[key] for key in ('enabled', 'code', 'percent', 'starts_at', 'ends_at')}
+        return jsonify({'discount': public_settings}), 200
     except Exception as e:
         print(f"ERROR fetching discount settings: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -2420,10 +2423,15 @@ def admin_discount_settings():
             return jsonify({'discount': get_discount_settings()}), 200
 
         data = request.json or {}
-        if 'enabled' not in data:
-            return jsonify({'error': 'Missing enabled field'}), 400
+        if 'enabled' not in data and 'secret_enabled' not in data:
+            return jsonify({'error': 'Missing discount setting'}), 400
 
-        settings = set_discount_enabled(bool(data.get('enabled')))
+        settings = get_discount_settings()
+        if 'enabled' in data:
+            settings['enabled'] = bool(data.get('enabled'))
+        if 'secret_enabled' in data:
+            settings['secret_enabled'] = bool(data.get('secret_enabled'))
+        save_discount_settings_data(settings)
         return jsonify({'success': True, 'discount': settings}), 200
     except Exception as e:
         print(f"ERROR updating discount settings: {str(e)}")
