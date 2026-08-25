@@ -5,8 +5,8 @@ let appliedDiscountCode = null;
 let appliedDiscountPercent = 0;
 let discountConfig = {
   enabled: true,
-  code: 'LEANR10',
-  percent: 10
+  code: 'BANKHOLIDAY15',
+  percent: 15
 };
 const secretDiscountConfig = {
   code: 'QUEENS',
@@ -88,8 +88,8 @@ function initDiscountSettings() {
       const discount = data.discount || {};
       discountConfig = {
         enabled: !!discount.enabled,
-        code: (discount.code || 'LEANR10').toString().trim().toUpperCase(),
-        percent: Number.isFinite(Number(discount.percent)) ? Number(discount.percent) : 10
+        code: (discount.code || 'BANKHOLIDAY15').toString().trim().toUpperCase(),
+        percent: Number.isFinite(Number(discount.percent)) ? Number(discount.percent) : 15
       };
       applyDiscountUiState();
       renderCart();

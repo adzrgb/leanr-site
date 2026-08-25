@@ -15,6 +15,7 @@ import requests
 import smtplib
 import base64
 import shutil
+from zoneinfo import ZoneInfo
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -116,8 +117,10 @@ PRODUCT_SUGGESTIONS_KEY = "product_suggestions"
 
 DEFAULT_DISCOUNT_SETTINGS = {
     "enabled": True,
-    "code": "LEANR10",
-    "percent": 10
+    "code": "BANKHOLIDAY15",
+    "percent": 15,
+    "starts_at": "2026-08-26T00:00:00",
+    "ends_at": "2026-09-01T00:00:00"
 }
 
 DEFAULT_PRODUCT_VISIBILITY = {
@@ -128,7 +131,11 @@ DEFAULT_PRODUCT_VISIBILITY = {
     "MULTI BUY BUNDLE": True,
     "GHK-CU": True,
     "KLOW PEN": True,
-    "CAGRI": True
+    "CAGRI": True,
+    "NAD+": True,
+    "MOTS-C": True,
+    "SELANK": True,
+    "SEMAX": True
 }
 
 SECRET_DISCOUNT_CODE = "QUEENS"
@@ -279,10 +286,20 @@ def get_discount_settings():
     if percent < 0:
         percent = 0
 
+    starts_at = str(raw.get('starts_at', DEFAULT_DISCOUNT_SETTINGS['starts_at']))
+    ends_at = str(raw.get('ends_at', DEFAULT_DISCOUNT_SETTINGS['ends_at']))
+    try:
+        now = datetime.now(ZoneInfo('Europe/London')).replace(tzinfo=None)
+        enabled = enabled and datetime.fromisoformat(starts_at) <= now < datetime.fromisoformat(ends_at)
+    except (TypeError, ValueError):
+        enabled = False
+
     return {
         'enabled': enabled,
         'code': code,
-        'percent': percent
+        'percent': percent,
+        'starts_at': starts_at,
+        'ends_at': ends_at
     }
 
 def set_discount_enabled(enabled):
@@ -338,7 +355,11 @@ default_stock = {
         {"name": "Pen", "stock": 50}
     ],
     "KLOW PEN": {"stock": 50},
-    "CAGRI": {"stock": 50}
+    "CAGRI": {"stock": 50},
+    "NAD+": {"stock": 50},
+    "MOTS-C": {"stock": 50},
+    "SELANK": {"stock": 50},
+    "SEMAX": {"stock": 50}
 }
 
 if not os.path.exists(STOCK_FILE):
@@ -375,7 +396,10 @@ for product_name, default_value in default_stock.items():
 if stock_changed:
     save_stock_data(current_stock)
 
-if not load_discount_settings_data():
+current_discount_settings = load_discount_settings_data()
+if not current_discount_settings:
+    save_discount_settings_data(DEFAULT_DISCOUNT_SETTINGS)
+elif current_discount_settings.get('code') == 'LEANR10' and 'starts_at' not in current_discount_settings:
     save_discount_settings_data(DEFAULT_DISCOUNT_SETTINGS)
 
 if not load_product_visibility_data():

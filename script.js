@@ -90,7 +90,7 @@ function initDiscountPopup() {
         }
       })
       .catch(() => {
-        // Fallback: keep current popup behavior if settings request fails.
+        // Fallback: keep the sale messaging if settings request fails.
         if (!localStorage.getItem('discount-popup-dismissed')) {
           setTimeout(() => {
             popup.classList.add('active');
