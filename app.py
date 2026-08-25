@@ -8,6 +8,7 @@ import hashlib
 from html import escape
 import time
 import random
+import re
 from dotenv import load_dotenv
 import threading
 import sys
@@ -455,8 +456,17 @@ def _extract_variant_name(option_value):
     """Normalize cart option text to a stock variant name."""
     if not option_value:
         return "default"
-    # Frontend stores options like "20mg — £89"; we only need the variant label.
-    return str(option_value).split(" — ")[0].strip() or "default"
+
+    raw_value = str(option_value).strip()
+    if not raw_value:
+        return "default"
+
+    # Frontend variants are stored as texts like:
+    # "20mg — £89", "Pen - Free bank holiday gift", "Nasal — £35 (...)"
+    # We only need the variant name before the pricing or gift suffix.
+    parts = re.split(r"\s*(?:—|–|-)\s*", raw_value, maxsplit=1)
+    normalized = parts[0].strip()
+    return normalized or "default"
 
 def _get_mt2_nasal_stock_multiplier(option_value):
     """Return stock multiplier for MT2 Nasal based on selected strength text."""
