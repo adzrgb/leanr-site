@@ -24,6 +24,13 @@
     </header>
 
     <main id="cart-page">
+      <div class="payment-warning-popup" id="payment-warning-popup" role="dialog" aria-modal="true" aria-labelledby="payment-warning-title">
+        <div class="payment-warning-content">
+          <button type="button" class="payment-warning-close" id="payment-warning-close" aria-label="Close PayPal payment notice">&times;</button>
+          <h2 id="payment-warning-title">PayPal payment notice</h2>
+          <p>If you pay with PayPal Goods and Services, you must cover the 2.9% payment fee. The exact fee and total amount to send are shown below.</p>
+        </div>
+      </div>
       <section class="section">
         <div class="section-heading">
           <p class="eyebrow">Your Order</p>
@@ -63,6 +70,14 @@
               <div class="summary-row total">
                 <span>Total</span>
                 <span id="total">£0.00</span>
+              </div>
+              <div class="summary-row paypal-fee-row" id="paypal-fee-row">
+                <span>PayPal Goods and Services fee (2.9%)</span>
+                <span id="paypal-fee">£0.00</span>
+              </div>
+              <div class="summary-row paypal-total-row" id="paypal-total-row">
+                <span>Amount to send with PayPal G&amp;S</span>
+                <span id="paypal-total">£0.00</span>
               </div>
             </div>
 
@@ -147,7 +162,7 @@
               </form>
 
               <p class="payment-info">
-                <strong>Postage:</strong> £5 on orders under £100, <strong>or FREE if Royal Mail QR is selected</strong> | Free delivery on orders £100+ | <strong>Note:</strong> After submitting, we'll send you an order confirmation with payment details. Payment can be made via bank transfer or your preferred method. If you pay via Goods and Services, you must cover the payment fee.
+                <strong>Postage:</strong> £5 on orders under £100, <strong>or FREE if Royal Mail QR is selected</strong> | Free delivery on orders £100+ | <strong>Bank holiday gifts:</strong> orders over £150 and under £200 receive a free MT2 nasal spray; orders £200+ receive a free GHK-CU pen. | <strong>Note:</strong> After submitting, we'll send you an order confirmation with payment details. If you pay via PayPal Goods and Services, please send the amount shown above.
               </p>
             </div>
 

@@ -140,6 +140,11 @@ DEFAULT_PRODUCT_VISIBILITY = {
 
 SECRET_DISCOUNT_CODE = "QUEENS"
 SECRET_DISCOUNT_PERCENT = 10
+PAYPAL_FEE_PERCENT = 2.9
+SALE_GIFT_NAMES = {
+    "MT2": "Nasal - Free bank holiday gift",
+    "GHK-CU": "Pen - Free bank holiday gift"
+}
 
 print(f"DEBUG: DATA_DIR in use: {DATA_DIR}", flush=True)
 
@@ -567,6 +572,18 @@ def send_order():
 
         subtotal_value = float(data.get('subtotal', 0) or 0)
         postage_value = float(data.get('postage', 0) or 0)
+
+        gift_items = [item for item in data.get('items', []) if item.get('option', '').endswith('Free bank holiday gift')]
+        allowed_gifts = set()
+        if discount_settings['enabled'] and subtotal_value > 150 and subtotal_value < 200:
+            allowed_gifts.add(('MT2', SALE_GIFT_NAMES['MT2']))
+        if discount_settings['enabled'] and subtotal_value >= 200:
+            allowed_gifts.add(('GHK-CU', SALE_GIFT_NAMES['GHK-CU']))
+        for gift in gift_items:
+            gift_key = (gift.get('name'), gift.get('option'))
+            if gift_key not in allowed_gifts or gift.get('price') != 0 or gift.get('quantity') != 1:
+                return jsonify({'success': False, 'error': 'Bank holiday gift eligibility could not be verified'}), 400
+
         max_allowed_discount = subtotal_value * (allowed_percent / 100)
 
         if submitted_discount < 0:
@@ -619,6 +636,8 @@ def send_order():
             'discountCode': data.get('discountCode', None),
             'postage': data.get('postage', 0),
             'total': data.get('total', data['subtotal']),
+            'paypalFee': round(float(data.get('paypalFee', 0) or 0), 2),
+            'paypalTotal': round(float(data.get('paypalTotal', data.get('total', data['subtotal'])) or 0), 2),
             'timestamp': data['timestamp'],
             'paymentConfirmed': False
         }

@@ -4,9 +4,14 @@ let discountApplied = false;
 let appliedDiscountCode = null;
 let appliedDiscountPercent = 0;
 let discountConfig = {
-  enabled: true,
+  enabled: false,
   code: 'BANKHOLIDAY15',
   percent: 15
+};
+const PAYPAL_FEE_PERCENT = 2.9;
+const SALE_GIFT_ITEMS = {
+  mt2: { name: 'MT2', option: 'Nasal - Free bank holiday gift' },
+  ghkcu: { name: 'GHK-CU', option: 'Pen - Free bank holiday gift' }
 };
 const secretDiscountConfig = {
   code: 'QUEENS',
@@ -132,6 +137,30 @@ function calculatePostage(subtotal) {
   return shouldUseRoyalMailQr(subtotal) ? 0 : 5;
 }
 
+function syncSaleGifts(subtotal) {
+  const giftNames = new Set(Object.values(SALE_GIFT_ITEMS).map(gift => gift.name));
+  for (let index = cart.length - 1; index >= 0; index -= 1) {
+    if (giftNames.has(cart[index].name) && cart[index].option?.includes('Free bank holiday gift')) {
+      cart.splice(index, 1);
+    }
+  }
+
+  if (!discountConfig.enabled) return;
+  if (subtotal > 150 && subtotal < 200) {
+    cart.push({ ...SALE_GIFT_ITEMS.mt2, price: 0, quantity: 1 });
+  }
+  if (subtotal >= 200) {
+    cart.push({ ...SALE_GIFT_ITEMS.ghkcu, price: 0, quantity: 1 });
+  }
+  saveCart();
+}
+
+function updatePaypalFee(total) {
+  const fee = total * (PAYPAL_FEE_PERCENT / 100);
+  document.getElementById('paypal-fee').textContent = `£${fee.toFixed(2)}`;
+  document.getElementById('paypal-total').textContent = `£${(total + fee).toFixed(2)}`;
+}
+
 function renderCart() {
   const cartEmpty = document.getElementById('cart-empty');
   const cartItems = document.getElementById('cart-items');
@@ -145,6 +174,14 @@ function renderCart() {
   
   cartEmpty.style.display = 'none';
   cartItems.style.display = 'block';
+
+  const merchandiseSubtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const giftCountBeforeSync = cart.length;
+  syncSaleGifts(merchandiseSubtotal);
+  if (cart.length !== giftCountBeforeSync) {
+    renderCart();
+    return;
+  }
   
   itemsList.innerHTML = '';
   let subtotal = 0;
@@ -188,6 +225,7 @@ function renderCart() {
   document.getElementById('subtotal').textContent = `£${subtotal.toFixed(2)}`;
   document.getElementById('delivery').textContent = postage === 0 ? 'FREE' : `£${postage.toFixed(2)}`;
   document.getElementById('total').textContent = `£${total.toFixed(2)}`;
+  updatePaypalFee(total);
   updateRoyalMailQrSection(subtotal);
   
   // Add remove listeners
@@ -252,6 +290,7 @@ if (checkoutForm) {
     // Calculate postage (£5 under £100, but waived when Royal Mail QR option is selected)
     const postage = calculatePostage(subtotal);
     const total = subtotal - discountAmount + postage;
+    const paypalFee = total * (PAYPAL_FEE_PERCENT / 100);
     const royalMailQrCode = subtotal < 100 ? (document.getElementById('royalmail-qr-code')?.value || '').trim() : '';
     const royalMailQrPhotoFile = subtotal < 100 ? document.getElementById('royalmail-qr-photo')?.files?.[0] : null;
 
@@ -301,6 +340,8 @@ if (checkoutForm) {
       discountCode: discountApplied ? appliedDiscountCode : null,
       postage: postage,
       total: total,
+      paypalFee: paypalFee,
+      paypalTotal: total + paypalFee,
       timestamp: new Date().toISOString()
     };
     
@@ -363,6 +404,14 @@ updateCartCount();
 renderCart();
 initCheckoutUpsell();
 initDiscountSettings();
+
+const paymentWarningPopup = document.getElementById('payment-warning-popup');
+const paymentWarningClose = document.getElementById('payment-warning-close');
+if (paymentWarningPopup && paymentWarningClose) {
+  paymentWarningClose.addEventListener('click', () => {
+    paymentWarningPopup.hidden = true;
+  });
+}
 
 // Setup discount code handler - INLINE to ensure it runs
 document.addEventListener('DOMContentLoaded', function() {

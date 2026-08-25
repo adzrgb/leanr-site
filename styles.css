@@ -75,6 +75,61 @@
   transition: all 0.3s ease;
 }
 
+.payment-warning-popup {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.62);
+  z-index: 210;
+}
+
+.payment-warning-popup[hidden] {
+  display: none;
+}
+
+.payment-warning-content {
+  position: relative;
+  width: min(100%, 430px);
+  padding: 2rem 1.5rem 1.5rem;
+  border: 2px solid #f59e0b;
+  border-radius: 0.8rem;
+  background: #fff;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.3);
+}
+
+.payment-warning-content h2 {
+  margin: 0 2rem 0.75rem 0;
+  color: #92400e;
+  font-size: 1.3rem;
+}
+
+.payment-warning-content p {
+  margin: 0;
+}
+
+.payment-warning-close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.7rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 1.8rem;
+  line-height: 1;
+  touch-action: manipulation;
+}
+
+.payment-warning-close:hover,
+.payment-warning-close:focus-visible {
+  color: #92400e;
+}
+
 .discount-popup.active {
   opacity: 1;
   visibility: visible;
@@ -1045,6 +1100,15 @@ blockquote footer {
   font-size: 0.95rem;
   color: var(--text);
   margin-top: 1.5rem;
+}
+
+.paypal-fee-row,
+.paypal-total-row {
+  color: #92400e;
+}
+
+.paypal-total-row {
+  font-weight: 700;
 }
 
 .discount-section {
