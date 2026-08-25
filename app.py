@@ -119,7 +119,7 @@ DEFAULT_DISCOUNT_SETTINGS = {
     "enabled": True,
     "code": "BANKHOLIDAY15",
     "percent": 15,
-    "starts_at": "2026-08-26T00:00:00",
+    "starts_at": "2026-08-25T00:00:00",
     "ends_at": "2026-09-01T00:00:00",
     "secret_enabled": False
 }
@@ -408,7 +408,7 @@ if stock_changed:
 current_discount_settings = load_discount_settings_data()
 if not current_discount_settings:
     save_discount_settings_data(DEFAULT_DISCOUNT_SETTINGS)
-elif current_discount_settings.get('code') == 'LEANR10' and 'starts_at' not in current_discount_settings:
+elif current_discount_settings.get('starts_at') == '2026-08-26T00:00:00':
     save_discount_settings_data(DEFAULT_DISCOUNT_SETTINGS)
 
 if not load_product_visibility_data():
