@@ -13,6 +13,7 @@ const SALE_GIFT_ITEMS = {
   mt2: { name: 'MT2', option: 'Nasal - Free bank holiday gift' },
   ghkcu: { name: 'GHK-CU', option: 'Pen - Free bank holiday gift' }
 };
+let saleGiftStock = { MT2: 0, 'GHK-CU': 0 };
 const secretDiscountConfig = {
   code: 'QUEENS',
   percent: 10
@@ -153,13 +154,43 @@ function syncSaleGifts(subtotal) {
   }
 
   if (!discountConfig.enabled) return;
-  if (subtotal > 150 && subtotal < 200) {
+
+  const discountedSubtotal = subtotal * (1 - (discountConfig.percent / 100));
+  const mt2Stock = Number(saleGiftStock.MT2 || 0);
+  const ghkcuStock = Number(saleGiftStock['GHK-CU'] || 0);
+
+  if (discountedSubtotal >= 200 && ghkcuStock > 0) {
+    cart.push({ ...SALE_GIFT_ITEMS.ghkcu, price: 0, quantity: 1 });
+  } else if (discountedSubtotal >= 150 && mt2Stock > 0) {
     cart.push({ ...SALE_GIFT_ITEMS.mt2, price: 0, quantity: 1 });
   }
-  if (subtotal >= 200) {
-    cart.push({ ...SALE_GIFT_ITEMS.ghkcu, price: 0, quantity: 1 });
-  }
   saveCart();
+}
+
+async function loadSaleGiftStock() {
+  try {
+    const response = await fetch(window.location.origin + '/api/public/stock');
+    const data = await response.json();
+    const stockList = data.stock || [];
+    const stockMap = {};
+
+    stockList.forEach(item => {
+      if (item && Array.isArray(item.variants)) {
+        const variantMap = {};
+        item.variants.forEach(variant => {
+          variantMap[variant.name] = Number(variant.stock || 0);
+        });
+        stockMap[item.name] = variantMap;
+      }
+    });
+
+    saleGiftStock = {
+      MT2: Number(stockMap.MT2?.Nasal || 0),
+      'GHK-CU': Number(stockMap['GHK-CU']?.Pen || 0)
+    };
+  } catch (error) {
+    saleGiftStock = { MT2: 0, 'GHK-CU': 0 };
+  }
 }
 
 function updatePaypalFee(total) {
@@ -408,7 +439,9 @@ document.querySelector('.signup-form')?.addEventListener('submit', (event) => {
 
 // Initialize
 updateCartCount();
-renderCart();
+loadSaleGiftStock().finally(() => {
+  renderCart();
+});
 initCheckoutUpsell();
 initDiscountSettings();
 

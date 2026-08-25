@@ -311,6 +311,36 @@ def get_discount_settings():
         'secret_enabled': bool(raw.get('secret_enabled', DEFAULT_DISCOUNT_SETTINGS['secret_enabled']))
     }
 
+def get_sale_gift_stock(stock_data=None):
+    """Return the available stock for the bank holiday free gifts."""
+    if stock_data is None:
+        stock_data = load_stock_data()
+
+    mt2_stock = _get_variant_stock(stock_data, 'MT2', 'Nasal') or 0
+    ghkcu_stock = _get_variant_stock(stock_data, 'GHK-CU', 'Pen') or 0
+    return {
+        'MT2': int(mt2_stock),
+        'GHK-CU': int(ghkcu_stock)
+    }
+
+
+def get_sale_gift_tier(subtotal, discount_percent=0, stock_data=None):
+    """Return the eligible free gift tier based on the discounted subtotal and gift stock."""
+    subtotal_value = float(subtotal or 0)
+    percent_value = float(discount_percent or 0)
+    if percent_value < 0:
+        percent_value = 0
+
+    discounted_subtotal = subtotal_value * (1 - (percent_value / 100))
+    available_stock = get_sale_gift_stock(stock_data)
+
+    if discounted_subtotal >= 200:
+        return 'GHK-CU' if available_stock['GHK-CU'] > 0 else None
+    if discounted_subtotal >= 150:
+        return 'MT2' if available_stock['MT2'] > 0 else None
+    return None
+
+
 def set_discount_enabled(enabled):
     settings = get_discount_settings()
     settings['enabled'] = bool(enabled)
@@ -579,10 +609,13 @@ def send_order():
 
         gift_items = [item for item in data.get('items', []) if item.get('option', '').endswith('Free bank holiday gift')]
         allowed_gifts = set()
-        if discount_settings['enabled'] and subtotal_value > 150 and subtotal_value < 200:
-            allowed_gifts.add(('MT2', SALE_GIFT_NAMES['MT2']))
-        if discount_settings['enabled'] and subtotal_value >= 200:
-            allowed_gifts.add(('GHK-CU', SALE_GIFT_NAMES['GHK-CU']))
+        if discount_settings['enabled']:
+            stock_state = load_stock_data()
+            gift_tier = get_sale_gift_tier(subtotal_value, allowed_percent, stock_state)
+            if gift_tier == 'MT2':
+                allowed_gifts.add(('MT2', SALE_GIFT_NAMES['MT2']))
+            elif gift_tier == 'GHK-CU':
+                allowed_gifts.add(('GHK-CU', SALE_GIFT_NAMES['GHK-CU']))
         for gift in gift_items:
             gift_key = (gift.get('name'), gift.get('option'))
             if gift_key not in allowed_gifts or gift.get('price') != 0 or gift.get('quantity') != 1:
@@ -746,9 +779,11 @@ def send_order_emails(data, items_html):
                         <p><strong>Subtotal:</strong> £{data.get('subtotal', 0):.2f}</p>
                         {f"<p style='color: #10b981;'><strong>Discount ({data.get('discountCode', 'N/A')}):</strong> -£{data.get('discountAmount', 0):.2f}</p>" if data.get('discountAmount', 0) > 0 else ""}
                         <p><strong>Postage:</strong> £{data.get('postage', 0):.2f}</p>
+                        <p><strong>PayPal fee (2.9%):</strong> £{data.get('paypalFee', 0):.2f}</p>
                         <div class="total" style="border-top: 2px solid #0052cc; padding-top: 10px;">
                             Total: £{data.get('total', data.get('subtotal', 0)):.2f}
                         </div>
+                        <p style="margin-top: 10px;"><strong>Amount to send with PayPal G&amp;S:</strong> £{data.get('paypalTotal', data.get('total', data.get('subtotal', 0))):.2f}</p>
                     </div>
                 </div>
             </body>
@@ -787,7 +822,9 @@ def send_order_emails(data, items_html):
                         <p><strong>Subtotal:</strong> £{data.get('subtotal', 0):.2f}</p>
                         {f"<p style='color: #10b981;'><strong>Discount:</strong> -£{data.get('discountAmount', 0):.2f}</p>" if data.get('discountAmount', 0) > 0 else ""}
                         <p><strong>Postage:</strong> £{data.get('postage', 0):.2f}</p>
+                        <p><strong>PayPal fee (2.9%):</strong> £{data.get('paypalFee', 0):.2f}</p>
                         <div class="total">Total: £{data.get('total', data.get('subtotal', 0)):.2f}</div>
+                        <p style="margin-top: 10px;"><strong>Amount to send with PayPal G&amp;S:</strong> £{data.get('paypalTotal', data.get('total', data.get('subtotal', 0))):.2f}</p>
                     </div>
                     <div class="payment-section">
                         <h3>Payment Information</h3>
