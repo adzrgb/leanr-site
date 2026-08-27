@@ -456,8 +456,8 @@ initDiscountSettings();
 const paymentWarningPopup = document.getElementById('payment-warning-popup');
 const paymentWarningClose = document.getElementById('payment-warning-close');
 if (paymentWarningPopup && paymentWarningClose) {
-  paymentWarningClose.addEventListener('click', () => {
-    paymentWarningPopup.hidden = true;
+  paymentWarningClose.addEventListener('pointerup', () => {
+    paymentWarningPopup.hidden = true;     paymentWarningPopup.style.display = 'none';
   });
 }
 
