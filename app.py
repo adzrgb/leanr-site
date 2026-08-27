@@ -15,14 +15,13 @@ import sys
 import requests
 import smtplib
 import base64
+
 import shutil
 from zoneinfo import ZoneInfo
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
-from email import encoders
 
-load_dotenv()
 
 app = Flask(__name__)
 
@@ -2714,7 +2713,7 @@ def serve_cart_script():
 @app.route('/<path:filename>')
 def serve_image_asset(filename):
     """Serve only image assets from the project root."""
-    allowed_extensions = {'.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico'}
+    allowed_extensions = {'.png', '.jpg', '.jpeg', '.webp', '.gif', '.ico', '.html'}
     extension = os.path.splitext(filename)[1].lower()
     if extension not in allowed_extensions or '/' in filename or '\\' in filename:
         return jsonify({'error': 'Not found'}), 404
