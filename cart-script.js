@@ -15,7 +15,7 @@ const SALE_GIFT_ITEMS = {
 };
 let saleGiftStock = { MT2: 0, 'GHK-CU': 0 };
 const secretDiscountConfig = {
-          localStorage.setItem('leanr-last-order', JSON.stringify(orderData));
+  code: 'QUEENS',
   percent: 10
 };
 
@@ -382,9 +382,9 @@ if (checkoutForm) {
       paypalTotal: total + paypalFee,
       timestamp: new Date().toISOString()
     };
-    
-    const confirmationTab = window.open('about:blank', '_blank');
 
+    const confirmationTab = window.open('about:blank', '_blank');
+    
     try {
       const response = await fetch(window.location.origin + '/api/send-order', {
         method: 'POST',
@@ -396,14 +396,20 @@ if (checkoutForm) {
       
       if (response.ok) {
         localStorage.setItem('leanr-last-order', JSON.stringify(orderData));
-        localStorage.setItem('leanr-last-order', JSON.stringify(orderData));         localStorage.removeItem('leanr-cart');
-        if (confirmationTab) { confirmationTab.location.href = 'order-confirmation.html'; } else { window.location.href = 'order-confirmation.html'; }
+        localStorage.removeItem('leanr-cart');
+        if (confirmationTab) {
+          confirmationTab.location.href = 'order-confirmation.html';
+        } else {
+          window.location.href = 'order-confirmation.html';
+        }
       } else {
+        confirmationTab?.close();
         const errData = await response.json().catch(() => ({}));
         console.error('Order error:', errData);
         alert('There was an issue processing your order: ' + (errData.error || response.status));
       }
     } catch (error) {
+      confirmationTab?.close();
       console.error('Error:', error);
       alert('Unable to process order: ' + error.message);
     }
