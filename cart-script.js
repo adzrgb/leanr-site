@@ -383,6 +383,8 @@ if (checkoutForm) {
       timestamp: new Date().toISOString()
     };
     
+    const confirmationTab = window.open('about:blank', '_blank');
+
     try {
       const response = await fetch(window.location.origin + '/api/send-order', {
         method: 'POST',
@@ -395,7 +397,7 @@ if (checkoutForm) {
       if (response.ok) {
         alert(`Order confirmed! Order number: ${orderData.orderNumber}\n\nConfirmation email sent to your email address. Payment details will be provided in the email.`);
         localStorage.removeItem('leanr-cart');
-        window.location.href = 'index.html';
+        if (confirmationTab) { confirmationTab.location.href = 'order-confirmation.html'; } else { window.location.href = 'order-confirmation.html'; }
       } else {
         const errData = await response.json().catch(() => ({}));
         console.error('Order error:', errData);
