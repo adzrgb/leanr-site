@@ -2676,7 +2676,7 @@ def serve_cart():
     with open('cart.html', encoding='utf-8') as f:
         return f.read()
 
-@app.route('/admin.html')
+@app.route('/order-confirmation.html') def serve_order_confirmation():     with open('order-confirmation.html', encoding='utf-8') as f:         return f.read()  @app.route('/admin.html')
 def serve_admin():
     """Serve admin.html"""
     with open('admin.html', encoding='utf-8') as f:
