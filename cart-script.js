@@ -396,7 +396,7 @@ if (checkoutForm) {
       
       if (response.ok) {
         localStorage.setItem('leanr-last-order', JSON.stringify(orderData));
-        localStorage.removeItem('leanr-cart');
+        localStorage.setItem('leanr-last-order', JSON.stringify(orderData));         localStorage.removeItem('leanr-cart');
         if (confirmationTab) {
           confirmationTab.location.href = 'order-confirmation.html';
         } else {
