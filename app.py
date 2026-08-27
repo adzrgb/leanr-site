@@ -839,7 +839,7 @@ def send_order_emails(data, items_html):
                     <div class="payment-section">
                         <h3>Payment Information</h3>
                         <p><strong>Option 1: PayPal</strong><br>ellaclegg232@gmail.com</p>
-                        <p><strong>Option 2: Bank Transfer</strong><br>Sort: 23-01-20 | Account: 13050648<br>Reference: {data['orderNumber'][-4:]}<br><em>Please use the name A W when making the transfer. Don't worry if the name does not match your bank — this is normal.</em></p>
+                        <p><strong>Option 2: Bank Transfer</strong><br>Sort: 20-30-02 | Account: 90677582<br>Reference: {data['orderNumber'][-4:]}<br><em>Please use the name E Clegg when making the transfer. Don't worry if the name does not match your bank — this is normal.</em></p>
                     </div>
                     {f'''<div class="order-details">
                         <h3>Royal Mail QR (Under £100 Orders)</h3>
@@ -2101,8 +2101,8 @@ def send_payment_reminder():
                     <div class="payment-section">
                         <h3>Payment Details</h3>
                         <p><strong>PayPal</strong><br>ellaclegg232@gmail.com</p>
-                        <p><strong>Bank Transfer</strong><br>Sort code: 23-01-20<br>Account number: 13050648<br>Reference: {order_number[-4:]}</p>
-                        <p><em>Please use the name A W when making the transfer. Don't worry if the name does not match your bank — this is normal.</em></p>
+                        <p><strong>Bank Transfer</strong><br>Sort code: 20-30-02<br>Account number: 90677582<br>Reference: {order_number[-4:]}</p>
+                        <p><em>Please use the name E Clegg when making the transfer. Don't worry if the name does not match your bank — this is normal.</em></p>
                     </div>
                     <p>Please reply to this email if you have already paid or need any help.</p>
                     <p>Thank you,<br>The LEANr Team</p>
