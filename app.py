@@ -15,12 +15,7 @@ import sys
 import requests
 import smtplib
 import base64
-@app.route('/order-confirmation.html')
-def serve_order_confirmation():
-    with open('order-confirmation.html', encoding='utf-8') as f:
-        return f.read()
-
-@app.route('/admin.html')
+import shutil
 from zoneinfo import ZoneInfo
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -843,8 +838,8 @@ def send_order_emails(data, items_html):
                     </div>
                     <div class="payment-section">
                         <h3>Payment Information</h3>
-                        <p><strong>Option 1: PayPal</strong><br>ellaclegg232@gmail.com</p>
-                        <p><strong>Option 2: Bank Transfer</strong><br>Sort: 20-30-02 | Account: 90677582<br>Reference: {data['orderNumber'][-4:]}<br><em>Please use the name E Clegg when making the transfer. Don't worry if the name does not match your bank — this is normal.</em></p>
+                        <p><strong>PayPal:</strong> ellaclegg232@gmail.com</p>
+                        <p><strong>Bank Transfer:</strong> E Clegg<br>Sort code: 20-30-02<br>Account number: 90677582</p>
                     </div>
                     {f'''<div class="order-details">
                         <h3>Royal Mail QR (Under £100 Orders)</h3>
@@ -2105,9 +2100,8 @@ def send_payment_reminder():
                     </div>
                     <div class="payment-section">
                         <h3>Payment Details</h3>
-                        <p><strong>PayPal</strong><br>ellaclegg232@gmail.com</p>
-                        <p><strong>Bank Transfer</strong><br>Sort code: 20-30-02<br>Account number: 90677582<br>Reference: {order_number[-4:]}</p>
-                        <p><em>Please use the name E Clegg when making the transfer. Don't worry if the name does not match your bank — this is normal.</em></p>
+                        <p><strong>PayPal:</strong> ellaclegg232@gmail.com</p>
+                        <p><strong>Bank Transfer:</strong> E Clegg<br>Sort code: 20-30-02<br>Account number: 90677582</p>
                     </div>
                     <p>Please reply to this email if you have already paid or need any help.</p>
                     <p>Thank you,<br>The LEANr Team</p>
@@ -2681,7 +2675,13 @@ def serve_cart():
     with open('cart.html', encoding='utf-8') as f:
         return f.read()
 
-@app.route('/order-confirmation.html') def serve_order_confirmation():     with open('order-confirmation.html', encoding='utf-8') as f:         return f.read()  @app.route('/admin.html')
+@app.route('/order-confirmation.html')
+def serve_order_confirmation():
+    """Serve the post-checkout order confirmation page."""
+    with open('order-confirmation.html', encoding='utf-8') as f:
+        return f.read()
+
+@app.route('/admin.html')
 def serve_admin():
     """Serve admin.html"""
     with open('admin.html', encoding='utf-8') as f:
