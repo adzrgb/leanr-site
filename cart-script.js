@@ -15,7 +15,7 @@ const SALE_GIFT_ITEMS = {
 };
 let saleGiftStock = { MT2: 0, 'GHK-CU': 0 };
 const secretDiscountConfig = {
-          localStorage.setItem('leanr-last-order', JSON.stringify(orderData));
+  code: 'QUEENS',
   percent: 10
 };
 
@@ -396,7 +396,7 @@ if (checkoutForm) {
       
       if (response.ok) {
         localStorage.setItem('leanr-last-order', JSON.stringify(orderData));
-        localStorage.setItem('leanr-last-order', JSON.stringify(orderData));         localStorage.removeItem('leanr-cart');
+        localStorage.removeItem('leanr-cart');
         if (confirmationTab) {
           confirmationTab.location.href = 'order-confirmation.html';
         } else {
@@ -456,9 +456,13 @@ initDiscountSettings();
 const paymentWarningPopup = document.getElementById('payment-warning-popup');
 const paymentWarningClose = document.getElementById('payment-warning-close');
 if (paymentWarningPopup && paymentWarningClose) {
-  paymentWarningClose.addEventListener('click', () => {
-    paymentWarningPopup.hidden = true;     paymentWarningPopup.style.display = 'none';
-  });
+  const closePaymentWarning = (event) => {
+    event.preventDefault();
+    paymentWarningPopup.hidden = true;
+    paymentWarningPopup.style.display = 'none';
+  };
+  paymentWarningClose.addEventListener('click', closePaymentWarning);
+  paymentWarningClose.addEventListener('pointerup', closePaymentWarning);
 }
 
 // Setup discount code handler - INLINE to ensure it runs
