@@ -15,7 +15,12 @@ import sys
 import requests
 import smtplib
 import base64
-import shutil
+@app.route('/order-confirmation.html')
+def serve_order_confirmation():
+    with open('order-confirmation.html', encoding='utf-8') as f:
+        return f.read()
+
+@app.route('/admin.html')
 from zoneinfo import ZoneInfo
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
