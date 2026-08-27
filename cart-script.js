@@ -15,7 +15,7 @@ const SALE_GIFT_ITEMS = {
 };
 let saleGiftStock = { MT2: 0, 'GHK-CU': 0 };
 const secretDiscountConfig = {
-  code: 'QUEENS',
+          localStorage.setItem('leanr-last-order', JSON.stringify(orderData));
   percent: 10
 };
 
