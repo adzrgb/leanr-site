@@ -395,7 +395,7 @@ if (checkoutForm) {
       });
       
       if (response.ok) {
-        alert(`Order confirmed! Order number: ${orderData.orderNumber}\n\nConfirmation email sent to your email address. Payment details will be provided in the email.`);
+        localStorage.setItem('leanr-last-order', JSON.stringify(orderData));
         localStorage.removeItem('leanr-cart');
         if (confirmationTab) { confirmationTab.location.href = 'order-confirmation.html'; } else { window.location.href = 'order-confirmation.html'; }
       } else {
