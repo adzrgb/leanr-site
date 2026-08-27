@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LEANr | Order Confirmation</title>
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .confirmation-page { min-height: 100vh; background: linear-gradient(145deg, #f8fafc 0%, #e0f2fe 52%, #fce4ec 100%); }
+    .confirmation-wrap { width: min(100% - 2rem, 860px); margin: 0 auto; padding: 3rem 0 4rem; }
+    .confirmation-header { text-align: center; margin-bottom: 2rem; }
+    .confirmation-logo { width: min(210px, 52vw); height: auto; margin-bottom: 1.5rem; }
+    .confirmation-mark { width: 64px; height: 64px; margin: 0 auto 1rem; display: grid; place-items: center; border-radius: 50%; background: #10b981; color: white; font-size: 2rem; font-weight: 700; }
+    .confirmation-header h1 { margin: 0; color: var(--text); }
+    .confirmation-header p { color: var(--muted); margin: 0.6rem 0 0; }
+    .confirmation-card { background: rgba(255, 255, 255, 0.94); border: 1px solid rgba(15, 23, 42, 0.1); border-radius: 8px; padding: clamp(1.25rem, 4vw, 2.25rem); box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12); }
+    .confirmation-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .confirmation-detail { background: var(--panel); padding: 1rem; border-left: 3px solid var(--accent-pink); }
+    .confirmation-detail h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 0.45rem; }
+    .confirmation-detail p { margin: 0; white-space: pre-line; color: var(--text); }
+    .confirmation-items { width: 100%; border-collapse: collapse; margin: 0 0 1.5rem; }
+    .confirmation-items th, .confirmation-items td { padding: 0.8rem 0.5rem; border-bottom: 1px solid #e2e8f0; text-align: left; }
+    .confirmation-items th:last-child, .confirmation-items td:last-child { text-align: right; }
+    .confirmation-items th { color: var(--muted); font-size: 0.78rem; text-transform: uppercase; }
+    .confirmation-totals { max-width: 360px; margin-left: auto; }
+    .confirmation-total-row { display: flex; justify-content: space-between; gap: 1rem; padding: 0.45rem 0; color: var(--muted); }
+    .confirmation-total-row strong { color: var(--text); }
+    .confirmation-total-row.grand { border-top: 2px solid var(--primary-blue); margin-top: 0.45rem; padding-top: 0.8rem; font-size: 1.15rem; color: var(--text); }
+    .confirmation-payment { margin-top: 2rem; padding: 1.25rem; background: #fffbeb; border: 1px solid #fcd34d; border-left: 4px solid #f59e0b; }
+    .confirmation-payment h2 { margin: 0 0 0.7rem; font-size: 1.1rem; }
+    .confirmation-payment p { margin: 0.45rem 0; }
+    .confirmation-actions { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; margin-top: 2rem; }
+    .confirmation-error { text-align: center; }
+    @media (max-width: 620px) { .confirmation-grid { grid-template-columns: 1fr; } .confirmation-items { font-size: 0.88rem; } .confirmation-items th:nth-child(2), .confirmation-items td:nth-child(2) { display: none; } }
+  </style>
+</head>
+<body class="confirmation-page">
+  <main class="confirmation-wrap">
+    <header class="confirmation-header">
+      <img src="logo.jpeg" alt="LEANr" class="confirmation-logo" />
+      <div class="confirmation-mark" aria-hidden="true">&#10003;</div>
+      <h1>Order confirmed</h1>
+      <p>Your order has been received. Keep this page for your records.</p>
+    </header>
+    <section id="confirmation-content" class="confirmation-card" aria-live="polite"></section>
+  </main>
+  <script>
+    const money = value => `£${Number(value || 0).toFixed(2)}`;
+    const content = document.getElementById('confirmation-content');
+    const order = JSON.parse(localStorage.getItem('leanr-last-order') || 'null');
+
+    if (!order) {
+      content.innerHTML = '<div class="confirmation-error"><h2>Confirmation unavailable</h2><p>This confirmation has expired or has already been viewed.</p><a class="btn btn-primary" href="index.html">Return to LEANr</a></div>';
+    } else {
+      const itemRows = (order.items || []).map(item => `<tr><td>${item.name || ''}</td><td>${item.option || 'N/A'}</td><td>${item.quantity || 0}</td><td>${money(Number(item.price || 0) * Number(item.quantity || 0))}</td></tr>`).join('');
+      const discount = Number(order.discountAmount || 0);
+      content.innerHTML = `
+        <div class="confirmation-grid">
+          <div class="confirmation-detail"><h2>Order number</h2><p><strong>${order.orderNumber || ''}</strong></p></div>
+          <div class="confirmation-detail"><h2>Customer</h2><p>${order.customerName || ''}<br>${order.customerEmail || ''}<br>${order.customerPhone || ''}</p></div>
+          <div class="confirmation-detail"><h2>Delivery address</h2><p>${order.deliveryAddress || ''}\n${order.city || ''}\n${order.postcode || ''}</p></div>
+          <div class="confirmation-detail"><h2>Delivery option</h2><p>${order.useRoyalMailQr ? 'Royal Mail QR postage selected' : 'Standard delivery'}</p></div>
+        </div>
+        <h2>Order details</h2>
+        <table class="confirmation-items"><thead><tr><th>Product</th><th>Option</th><th>Qty</th><th>Total</th></tr></thead><tbody>${itemRows}</tbody></table>
+        <div class="confirmation-totals">
+          <div class="confirmation-total-row"><span>Subtotal</span><strong>${money(order.subtotal)}</strong></div>
+          ${discount > 0 ? `<div class="confirmation-total-row"><span>Discount</span><strong>-${money(discount)}</strong></div>` : ''}
+          <div class="confirmation-total-row"><span>Postage</span><strong>${money(order.postage)}</strong></div>
+          <div class="confirmation-total-row grand"><span>Total</span><strong>${money(order.total)}</strong></div>
+          <div class="confirmation-total-row"><span>PayPal fee (2.9%)</span><strong>${money(order.paypalFee)}</strong></div>
+          <div class="confirmation-total-row"><span>Amount to send with PayPal G&amp;S</span><strong>${money(order.paypalTotal)}</strong></div>
+        </div>
+        <div class="confirmation-payment"><h2>Payment information</h2><p><strong>PayPal:</strong> ellaclegg232@gmail.com</p><p><strong>Bank transfer:</strong> E Clegg<br>Sort code: 20-30-02<br>Account number: 90677582<br>Reference: ${String(order.orderNumber || '').slice(-4)}</p><p><strong>Important:</strong> Do not put peptides, reta, or product names in the payment reference. Use only the order reference shown above.</p></div>
+        <div class="confirmation-actions"><a class="btn btn-primary" href="index.html">Continue shopping</a><button class="btn btn-secondary" type="button" onclick="window.print()">Print confirmation</button></div>`;
+    }
+  </script>
+</body>
+</html>
