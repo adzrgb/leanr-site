@@ -206,7 +206,9 @@ DEFAULT_PRODUCT_VISIBILITY = {
     "NAD+": True,
     "MOTS-C": True,
     "SELANK": True,
-    "SEMAX": True
+    "SEMAX": True,
+    "LEANr Hoodie - £100": True,
+    "LEANr Hoodie - £130": True
 }
 
 SECRET_DISCOUNT_CODE = "QUEENS"

@@ -795,6 +795,12 @@
               `).join('<br>')}
               <div style="margin-top: 0.5rem; font-weight: 600;">Total: £${order.total.toFixed(2)}</div>
             </div>
+            ${order.orderNotes?.trim() ? `
+              <div class="order-notes">
+                <strong>Order notes</strong>
+                <p>${order.orderNotes.replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[character])).replace(/\n/g, '<br>')}</p>
+              </div>
+            ` : ''}
             <div class="tracking-section">
               <input type="text" class="tracking-input" data-order-number="${order.orderNumber}" placeholder="Enter tracking number..." value="${trackingDrafts[order.orderNumber] ?? order.trackingNumber ?? ''}">
               <button class="send-tracking-btn" onclick="sendTracking('${order.orderNumber}', this)">
