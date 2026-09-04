@@ -470,7 +470,9 @@ default_stock = {
     "NAD+": {"stock": 50},
     "MOTS-C": {"stock": 50},
     "SELANK": {"stock": 50},
-    "SEMAX": {"stock": 50}
+    "SEMAX": {"stock": 50},
+    "LEANr Hoodie - £100": {"stock": 50},
+    "LEANr Hoodie - £130": {"stock": 50}
 }
 
 if not os.path.exists(STOCK_FILE):
