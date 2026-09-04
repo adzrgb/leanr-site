@@ -42,6 +42,7 @@ function initSalePricing() {
 }
 
 function initProductVisibility() {
+  const productGrid = document.getElementById('product-grid');
   fetch(window.location.origin + '/api/public/product-visibility')
     .then(res => res.json())
     .then(data => {
@@ -53,9 +54,10 @@ function initProductVisibility() {
         card.classList.toggle('product-hidden', isHidden);
         card.style.display = isHidden ? 'none' : '';
       });
+      productGrid?.classList.add('visibility-ready');
     })
     .catch(() => {
-      // Keep products visible if the settings request is unavailable.
+      productGrid?.classList.add('visibility-ready');
     });
 }
 
