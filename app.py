@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, redirect, render_template_string, send_from_directory, session, url_for
 from flask_cors import CORS
 from datetime import datetime
 import json
@@ -24,6 +24,76 @@ from email.mime.base import MIMEBase
 
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
+
+SITE_PASSWORD = os.getenv("SITE_PASSWORD", "")
+
+SITE_ACCESS_TEMPLATE = """<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LEANr | Private Access</title>
+    <style>
+        :root { --blue: #0052cc; --pink: #ec4899; --ink: #0f172a; --muted: #64748b; }
+        * { box-sizing: border-box; }
+        body { background: radial-gradient(circle at 12% 10%, #e0f2fe 0, transparent 28%), radial-gradient(circle at 88% 84%, #fce4ec 0, transparent 30%), #f8fafc; color: var(--ink); font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; margin: 0; min-height: 100vh; }
+        header { align-items: center; background: rgba(255, 255, 255, 0.88); border-bottom: 1px solid #e2e8f0; display: flex; height: 76px; justify-content: center; padding: 12px 24px; }
+        header img { display: block; max-height: 44px; max-width: 158px; object-fit: contain; }
+        .shell { align-items: center; display: flex; justify-content: center; min-height: calc(100vh - 76px); padding: 32px 20px; }
+        main { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 20px 60px rgba(0, 82, 204, 0.13); max-width: 430px; overflow: hidden; padding: 42px; text-align: center; width: 100%; }
+        .eyebrow { color: var(--blue); font-size: 12px; font-weight: 700; letter-spacing: 1.2px; margin: 0 0 12px; }
+        h1 { font-size: 31px; line-height: 1.14; margin: 0 0 12px; }
+        .intro { color: var(--muted); line-height: 1.55; margin: 0 0 28px; }
+        form { display: grid; gap: 12px; }
+        input { border: 1px solid #cbd5e1; border-radius: 5px; color: var(--ink); font: inherit; min-width: 0; outline: none; padding: 13px 14px; width: 100%; }
+        input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.14); }
+        button { background: linear-gradient(135deg, var(--blue), var(--pink)); border: 0; border-radius: 5px; color: white; cursor: pointer; font: inherit; font-weight: 700; padding: 13px 16px; }
+        button:hover { filter: brightness(1.05); }
+        .error { color: #be123c; font-size: 14px; margin: 16px 0 0; }
+        @media (max-width: 480px) { header { height: 68px; } header img { max-height: 38px; } .shell { min-height: calc(100vh - 68px); padding: 20px 16px; } main { padding: 32px 24px; } h1 { font-size: 27px; } }
+    </style>
+</head>
+<body>
+    <header><img src="/logo.jpeg" alt="LEANr"></header>
+    <div class="shell">
+        <main>
+            <p class="eyebrow">PRIVATE ACCESS</p>
+            <h1>Welcome to LEANr</h1>
+            <p class="intro">This space is currently reserved for invited visitors. Enter the access password to continue.</p>
+            <form method="post" action="{{ url_for('site_access') }}">
+                <input aria-label="Access password" autofocus name="password" placeholder="Access password" required type="password">
+                <button type="submit">Enter site</button>
+            </form>
+            {% if error %}<p class="error">Incorrect password. Please try again.</p>{% endif %}
+        </main>
+    </div>
+</body>
+</html>"""
+
+
+@app.before_request
+def require_site_password():
+    """Require a configured access password before serving the site."""
+    if not SITE_PASSWORD or request.endpoint in {"site_access", "static"} or request.path == "/logo.jpeg":
+        return None
+    if session.get("site_access_granted"):
+        return None
+    return redirect(url_for("site_access", next=request.full_path))
+
+
+@app.route("/site-access", methods=["GET", "POST"])
+def site_access():
+    """Display and process the temporary site access password form."""
+    if request.method == "POST":
+        if secrets.compare_digest(request.form.get("password", ""), SITE_PASSWORD):
+            session["site_access_granted"] = True
+            destination = request.args.get("next", "/")
+            if destination.startswith("/") and not destination.startswith("//"):
+                return redirect(destination)
+            return redirect(url_for("serve_index"))
+        return render_template_string(SITE_ACCESS_TEMPLATE, error=True), 401
+    return render_template_string(SITE_ACCESS_TEMPLATE, error=False)
 
 # CORS configuration - allow requests from localhost and production
 # For debugging: allow all origins
