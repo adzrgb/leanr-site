@@ -12,4 +12,8 @@ services:
     envVars:
       - key: DATA_DIR
         value: /var/data
+      - key: SECRET_KEY
+        generateValue: true
+      - key: SITE_PASSWORD
+        sync: false
 
