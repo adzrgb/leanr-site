@@ -263,6 +263,26 @@
       cursor: not-allowed;
     }
 
+    .hide-products-btn {
+      background: #dc2626;
+      color: white;
+      border: none;
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      margin-left: 0.5rem;
+    }
+
+    .hide-products-btn:hover {
+      background: #b91c1c;
+    }
+
+    .hide-products-btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
     .visibility-settings-card {
       max-width: 620px;
       background: #f8fafc;
@@ -691,6 +711,7 @@
           <div class="empty-state">Loading product visibility...</div>
         </div>
         <button class="discount-save-btn" id="save-visibility-btn" onclick="saveProductVisibility()">Save Product Visibility</button>
+        <button class="hide-products-btn" id="hide-hoodies-btn" onclick="hideHoodies()">Hide Hoodies From Store</button>
       </div>
     </div>
 
@@ -1141,7 +1162,9 @@
       'NAD+',
       'MOTS-C',
       'SELANK',
-      'SEMAX'
+      'SEMAX',
+      'LEANr Hoodie - £100',
+      'LEANr Hoodie - £130'
     ];
 
     async function loadProductVisibility() {
@@ -1211,6 +1234,13 @@
         button.disabled = false;
         button.textContent = 'Save Product Visibility';
       }
+    }
+
+    function hideHoodies() {
+      document.querySelectorAll('[data-product-visibility="LEANr Hoodie - £100"], [data-product-visibility="LEANr Hoodie - £130"]').forEach(toggle => {
+        toggle.checked = false;
+      });
+      saveProductVisibility();
     }
 
     async function loadSuggestions() {
