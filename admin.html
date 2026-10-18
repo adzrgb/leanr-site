@@ -644,6 +644,12 @@
         Customer Orders
         <button id="test-shipping-btn" class="test-label-btn" onclick="runShippingLabelTest(this)">Test Auto Label Setup</button>
       </h2>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 1rem;">
+        <label for="test-confirmation-email">Test customer confirmation email:</label>
+        <input id="test-confirmation-email" type="email" autocomplete="email" placeholder="you@example.com" required style="max-width: 280px; padding: 0.55rem; border: 1px solid #cbd5e1; border-radius: 6px;">
+        <button id="test-confirmation-btn" class="send-tracking-btn" onclick="sendTestConfirmationEmail(this)">Send Test Email</button>
+      </div>
+      <div id="test-confirmation-message" class="message" role="status" aria-live="polite"></div>
       <div id="orders-message" class="message"></div>
       <div id="orders-list" class="orders-list">
         <div class="empty-state">Loading orders...</div>
@@ -1437,6 +1443,50 @@
       } finally {
         trigger.disabled = false;
         trigger.textContent = 'Test Auto Label Setup';
+      }
+    }
+
+    async function sendTestConfirmationEmail(button) {
+      const token = localStorage.getItem('admin_token');
+      const emailInput = document.getElementById('test-confirmation-email');
+      const message = document.getElementById('test-confirmation-message');
+      const email = emailInput.value.trim();
+
+      if (!token) {
+        logout();
+        return;
+      }
+      if (!emailInput.checkValidity()) {
+        emailInput.reportValidity();
+        return;
+      }
+
+      button.disabled = true;
+      button.textContent = 'Sending...';
+      message.className = 'message';
+      message.textContent = '';
+
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/test-confirmation-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ email })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to send test confirmation email');
+        }
+        message.className = 'message success';
+        message.textContent = `✓ ${data.message} (${data.orderNumber}). No order was created.`;
+      } catch (error) {
+        message.className = 'message error';
+        message.textContent = `✗ ${error.message}`;
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Send Test Email';
       }
     }
 

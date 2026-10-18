@@ -790,7 +790,7 @@ def send_order():
         print(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)}), 500
 
-def send_order_emails(data, items_html):
+def send_order_emails(data, items_html, send_business_email=True):
     """Send order confirmation emails"""
     try:
         print(f"\n{'='*60}", flush=True)
@@ -905,14 +905,12 @@ def send_order_emails(data, items_html):
                         <p><strong>Subtotal:</strong> £{data.get('subtotal', 0):.2f}</p>
                         {f"<p style='color: #10b981;'><strong>Discount:</strong> -£{data.get('discountAmount', 0):.2f}</p>" if data.get('discountAmount', 0) > 0 else ""}
                         <p><strong>Postage:</strong> £{data.get('postage', 0):.2f}</p>
-                        <p><strong>PayPal fee (2.9%):</strong> £{data.get('paypalFee', 0):.2f}</p>
                         <div class="total">Total: £{data.get('total', data.get('subtotal', 0)):.2f}</div>
-                        <p style="margin-top: 10px;"><strong>Amount to send with PayPal G&amp;S:</strong> £{data.get('paypalTotal', data.get('total', data.get('subtotal', 0))):.2f}</p>
                     </div>
                     <div class="payment-section">
                         <h3>Payment Information</h3>
-                        <p><strong>PayPal:</strong> ellaclegg232@gmail.com</p>
                         <p><strong>Bank Transfer:</strong> E Clegg<br>Sort code: 20-30-02<br>Account number: 90677582</p>
+                        <p><strong>Additional Bank Account:</strong> MR A G WHALEN<br>Sort code: 51-70-43<br>Account number: 85451215</p>
                     </div>
                     {f'''<div class="order-details">
                         <h3>Royal Mail QR (Under £100 Orders)</h3>
@@ -925,21 +923,22 @@ def send_order_emails(data, items_html):
         </html>
         """
         
-        # Send business email
-        print(f"[1/2] Attempting to send BUSINESS email...", flush=True)
-        sys.stdout.flush()
-        business_sent, business_error = send_email(
-            BUSINESS_EMAIL,
-            f"New Order: {data['orderNumber']}",
-            business_email_body,
-            data['orderNumber'],
-            attachments=qr_attachments
-        )
-        if business_sent:
-            print(f"✓ Business email sent successfully", flush=True)
-        else:
-            print(f"⚠ Business email not delivered immediately: {business_error}", flush=True)
-        sys.stdout.flush()
+        business_sent = True
+        if send_business_email:
+            print(f"[1/2] Attempting to send BUSINESS email...", flush=True)
+            sys.stdout.flush()
+            business_sent, business_error = send_email(
+                BUSINESS_EMAIL,
+                f"New Order: {data['orderNumber']}",
+                business_email_body,
+                data['orderNumber'],
+                attachments=qr_attachments
+            )
+            if business_sent:
+                print(f"✓ Business email sent successfully", flush=True)
+            else:
+                print(f"⚠ Business email not delivered immediately: {business_error}", flush=True)
+            sys.stdout.flush()
 
         # Send customer email (independent from business email result)
         print(f"[2/2] Attempting to send CUSTOMER email...", flush=True)
@@ -951,6 +950,8 @@ def send_order_emails(data, items_html):
             data['orderNumber'],
             attachments=qr_attachments
         )
+        if not send_business_email:
+            return customer_sent, customer_error
         if customer_sent:
             print(f"✓ Customer email sent successfully", flush=True)
         else:
@@ -967,6 +968,7 @@ def send_order_emails(data, items_html):
         import traceback
         print(traceback.format_exc(), flush=True)
         sys.stdout.flush()
+        return False, str(e)
 
 def load_email_queue():
     """Load email queue from file"""
@@ -1661,6 +1663,51 @@ def verify_printnode_printer():
 def verify_token(token):
     """Verify admin token"""
     return token in ADMIN_TOKENS
+
+@app.route('/api/admin/test-confirmation-email', methods=['POST', 'OPTIONS'])
+def admin_test_confirmation_email():
+    """Send a sample customer order confirmation without creating an order."""
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header.replace('Bearer ', '', 1) if auth_header.startswith('Bearer ') else ''
+    if not verify_token(token):
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    recipient = str(payload.get('email', '')).strip()
+    if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', recipient):
+        return jsonify({'success': False, 'error': 'Enter a valid email address'}), 400
+
+    order_number = f"TEST-{int(time.time() * 1000)}"
+    sample_order = {
+        'orderNumber': order_number,
+        'customerName': 'Test Customer',
+        'customerEmail': recipient,
+        'customerPhone': '0000000000',
+        'deliveryAddress': '123 Test Street',
+        'city': 'London',
+        'postcode': 'SW1A 1AA',
+        'items': [{'name': 'Sample Product', 'option': 'Email Preview', 'quantity': 1, 'price': 1.00}],
+        'subtotal': 1.00,
+        'discountAmount': 0,
+        'postage': 0,
+        'total': 1.00,
+        'useRoyalMailQr': False,
+        'royalMailQrCode': ''
+    }
+    items_html = """<tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">Sample Product</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">Email Preview</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">1</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">£1.00</td>
+    </tr>"""
+
+    sent, error = send_order_emails(sample_order, items_html, send_business_email=False)
+    if not sent:
+        return jsonify({'success': False, 'error': f'Email could not be sent and may have been queued: {error}'}), 502
+    return jsonify({'success': True, 'message': f'Test confirmation sent to {recipient}', 'orderNumber': order_number}), 200
 
 @app.route('/api/admin/test-shipping-label', methods=['POST', 'OPTIONS'])
 def test_shipping_label_setup():
