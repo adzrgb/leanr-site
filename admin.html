@@ -635,6 +635,8 @@
       <button class="tab-button" onclick="switchTab('revenue')">Revenue</button>
       <button class="tab-button" onclick="switchTab('discount')">Discount</button>
       <button class="tab-button" onclick="switchTab('visibility')">Products</button>
+      <button class="tab-button" onclick="switchTab('catalog-text')">Catalogue Text</button>
+      <button class="tab-button" onclick="switchTab('bank-details')">Email Bank Details</button>
       <button class="tab-button" onclick="switchTab('suggestions')">Suggestions</button>
     </div>
     
@@ -660,6 +662,19 @@
     <div id="stock" class="tab-content">
       <h2>Update Stock Levels</h2>
       <div id="stock-message" class="message"></div>
+      <div class="stock-card" style="margin-bottom: 1.25rem;">
+        <h3>Add Inventory-Only Item</h3>
+        <p>This adds a stock record for back-office tracking only. It does not create a storefront listing or make the item orderable.</p>
+        <div class="stock-form-group">
+          <label for="new-inventory-name">Item name</label>
+          <input id="new-inventory-name" type="text" maxlength="80" placeholder="e.g. Packaging supplies">
+        </div>
+        <div class="stock-form-group">
+          <label for="new-inventory-stock">Starting stock</label>
+          <input id="new-inventory-stock" type="number" min="0" step="1" value="0">
+        </div>
+        <button class="discount-save-btn" id="add-inventory-item-btn" onclick="addInventoryItem()">Add Stock Item</button>
+      </div>
       <div class="stock-actions">
         <button class="save-stock-btn" id="save-stock-btn" onclick="saveAllStockChanges()">💾 Save All Changes</button>
         <button class="reset-stock-btn" id="reset-stock-btn" onclick="resetStockForm()">Reset Form</button>
@@ -721,6 +736,29 @@
       </div>
     </div>
 
+    <div id="catalog-text" class="tab-content">
+      <h2>Decorative Metal Initials</h2>
+      <div id="metal-catalog-message" class="message" role="status" aria-live="polite"></div>
+      <p>Edit the storefront names and descriptions for these two metal items. Prices remain £165 and £170.</p>
+      <div id="metal-catalog-editor" class="stock-grid">
+        <div class="empty-state">Loading catalogue details...</div>
+      </div>
+      <button class="discount-save-btn" id="save-metal-catalog-btn" onclick="saveMetalCatalog()">Save Catalogue Text</button>
+    </div>
+
+    <div id="bank-details" class="tab-content">
+      <h2>Bank Details in Customer Emails</h2>
+      <div id="bank-details-message" class="message" role="status" aria-live="polite"></div>
+      <p>These accounts appear in new order confirmations and payment reminders. Removing an account only affects emails sent after you save.</p>
+      <div id="bank-details-list" class="stock-grid">
+        <div class="empty-state">Loading bank details...</div>
+      </div>
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <button class="discount-save-btn" id="add-bank-account-btn" onclick="addBankAccountRow()">Add Bank Account</button>
+        <button class="discount-save-btn" id="save-bank-details-btn" onclick="saveBankDetails()">Save Bank Details</button>
+      </div>
+    </div>
+
     <div id="suggestions" class="tab-content">
       <h2>Product Suggestions</h2>
       <div id="suggestions-admin-message" class="message"></div>
@@ -744,6 +782,8 @@
       loadRevenue();
       loadDiscountSettings();
       loadProductVisibility();
+      loadMetalCatalog();
+      loadBankDetails();
       loadSuggestions();
 
       // Keep orders list fresh so new checkouts appear automatically.
@@ -931,6 +971,7 @@
         grid.innerHTML = data.stock.map(product => `
           <div class="stock-card">
             <h3>${product.name}</h3>
+            ${product.inventoryOnly ? '<p style="color: #64748b;">Back-office inventory only — not listed for sale.</p>' : ''}
             ${product.isVirtual ? `
               <div class="stock-form-group">
                 <label>Calculated Bundle Stock</label>
@@ -964,10 +1005,12 @@
                   value="${product.stock}"
                   data-product="${product.name}"
                   data-variant="default"
+                  ${product.inventoryOnly ? `data-inventory-id="${product.inventoryId}"` : ''}
                   oninput="trackStockChange(this)"
                   onchange="trackStockChange(this)">
               </div>
             `}
+            ${product.inventoryOnly ? `<button class="hide-products-btn" type="button" onclick="removeInventoryItem('${product.inventoryId}', this)">Remove Inventory Item</button>` : ''}
           </div>
         `).join('');
 
@@ -995,6 +1038,7 @@
       stockChanges[key] = {
         productName: product,
         variant: variant,
+        inventoryId: input.dataset.inventoryId || null,
         stock: parsed
       };
     }
@@ -1020,6 +1064,7 @@
           changes.push({
             productName: product,
             variant,
+            inventoryId: input.dataset.inventoryId || null,
             stock: parsed
           });
         }
@@ -1082,6 +1127,72 @@
       const msg = document.getElementById('stock-message');
       msg.className = 'message';
       msg.textContent = '';
+    }
+
+    async function addInventoryItem() {
+      const nameInput = document.getElementById('new-inventory-name');
+      const stockInput = document.getElementById('new-inventory-stock');
+      const button = document.getElementById('add-inventory-item-btn');
+      const message = document.getElementById('stock-message');
+      const name = nameInput.value.trim();
+      const stock = Number(stockInput.value);
+
+      if (!name || !Number.isInteger(stock) || stock < 0) {
+        message.className = 'message error';
+        message.textContent = 'Enter an item name and a non-negative whole-number stock quantity.';
+        return;
+      }
+
+      button.disabled = true;
+      button.textContent = 'Adding...';
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/inventory-items', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+          },
+          body: JSON.stringify({ name, stock })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not add inventory item');
+        nameInput.value = '';
+        stockInput.value = '0';
+        message.className = 'message success';
+        message.textContent = `✓ Added ${data.item.name} to back-office inventory.`;
+        await loadStockLevels();
+      } catch (error) {
+        message.className = 'message error';
+        message.textContent = `✗ ${error.message}`;
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Add Stock Item';
+      }
+    }
+
+    async function removeInventoryItem(inventoryId, button) {
+      if (!confirm('Remove this back-office inventory item? This does not remove or change any storefront listing.')) return;
+      const message = document.getElementById('stock-message');
+      button.disabled = true;
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/inventory-items', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+          },
+          body: JSON.stringify({ inventoryId })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not remove inventory item');
+        message.className = 'message success';
+        message.textContent = '✓ Inventory item removed.';
+        await loadStockLevels();
+      } catch (error) {
+        message.className = 'message error';
+        message.textContent = `✗ ${error.message}`;
+        button.disabled = false;
+      }
     }
 
     async function loadDiscountSettings() {
@@ -1247,6 +1358,220 @@
         toggle.checked = false;
       });
       saveProductVisibility();
+    }
+
+    async function loadMetalCatalog() {
+      const token = localStorage.getItem('admin_token');
+      const editor = document.getElementById('metal-catalog-editor');
+      const message = document.getElementById('metal-catalog-message');
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/metal-catalog', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not load catalogue text');
+
+        editor.replaceChildren();
+        Object.entries(data.catalog || {}).forEach(([productId, product]) => {
+          const card = document.createElement('div');
+          card.className = 'stock-card';
+          const heading = document.createElement('h3');
+          heading.textContent = `${productId.replaceAll('_', ' ')} — £${product.price}`;
+          card.appendChild(heading);
+
+          const nameGroup = document.createElement('div');
+          nameGroup.className = 'stock-form-group';
+          const nameLabel = document.createElement('label');
+          nameLabel.htmlFor = `metal-name-${productId}`;
+          nameLabel.textContent = 'Storefront name';
+          const nameInput = document.createElement('input');
+          nameInput.id = nameLabel.htmlFor;
+          nameInput.dataset.metalName = productId;
+          nameInput.maxLength = 80;
+          nameInput.value = product.name;
+          nameGroup.append(nameLabel, nameInput);
+          card.appendChild(nameGroup);
+
+          const descriptionGroup = document.createElement('div');
+          descriptionGroup.className = 'stock-form-group';
+          const descriptionLabel = document.createElement('label');
+          descriptionLabel.htmlFor = `metal-description-${productId}`;
+          descriptionLabel.textContent = 'Description';
+          const descriptionInput = document.createElement('textarea');
+          descriptionInput.id = descriptionLabel.htmlFor;
+          descriptionInput.dataset.metalDescription = productId;
+          descriptionInput.maxLength = 500;
+          descriptionInput.rows = 4;
+          descriptionInput.value = product.description;
+          descriptionInput.style.width = '100%';
+          descriptionInput.style.padding = '0.75rem';
+          descriptionInput.style.border = '1px solid #cbd5e1';
+          descriptionInput.style.borderRadius = '6px';
+          descriptionGroup.append(descriptionLabel, descriptionInput);
+          card.appendChild(descriptionGroup);
+          editor.appendChild(card);
+        });
+        message.textContent = '';
+      } catch (error) {
+        message.className = 'message error';
+        message.textContent = `✗ ${error.message}`;
+      }
+    }
+
+    async function saveMetalCatalog() {
+      const token = localStorage.getItem('admin_token');
+      const button = document.getElementById('save-metal-catalog-btn');
+      const message = document.getElementById('metal-catalog-message');
+      const catalog = {};
+      document.querySelectorAll('[data-metal-name]').forEach(input => {
+        const productId = input.dataset.metalName;
+        catalog[productId] = catalog[productId] || {};
+        catalog[productId].name = input.value.trim();
+      });
+      document.querySelectorAll('[data-metal-description]').forEach(input => {
+        const productId = input.dataset.metalDescription;
+        catalog[productId] = catalog[productId] || {};
+        catalog[productId].description = input.value.trim();
+      });
+
+      button.disabled = true;
+      button.textContent = 'Saving...';
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/metal-catalog', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ catalog })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not save catalogue text');
+        message.className = 'message success';
+        message.textContent = '✓ Catalogue names and descriptions saved.';
+      } catch (error) {
+        message.className = 'message error';
+        message.textContent = `✗ ${error.message}`;
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Save Catalogue Text';
+      }
+    }
+
+    function addBankAccountRow(account = {}) {
+      const list = document.getElementById('bank-details-list');
+      if (list.querySelectorAll('[data-bank-account]').length >= 10) {
+        const message = document.getElementById('bank-details-message');
+        message.className = 'message error';
+        message.textContent = 'You can configure up to 10 bank accounts.';
+        return;
+      }
+
+      list.querySelector('.empty-state')?.remove();
+      const row = document.createElement('div');
+      row.className = 'stock-card';
+      row.dataset.bankAccount = 'true';
+      const heading = document.createElement('h3');
+      heading.textContent = 'Bank account';
+      row.appendChild(heading);
+
+      const fields = [
+        { key: 'name', label: 'Account holder', value: account.name || '', maxLength: 80, placeholder: 'Account holder name' },
+        { key: 'sort_code', label: 'Sort code', value: account.sort_code || '', maxLength: 8, placeholder: '12-34-56' },
+        { key: 'account_number', label: 'Account number', value: account.account_number || '', maxLength: 8, placeholder: '8 digits' }
+      ];
+      fields.forEach(field => {
+        const group = document.createElement('div');
+        group.className = 'stock-form-group';
+        const label = document.createElement('label');
+        label.textContent = field.label;
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.dataset.bankField = field.key;
+        input.maxLength = field.maxLength;
+        input.placeholder = field.placeholder;
+        input.value = field.value;
+        label.appendChild(input);
+        group.appendChild(label);
+        row.appendChild(group);
+      });
+
+      const removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.className = 'hide-products-btn';
+      removeButton.textContent = 'Remove Account';
+      removeButton.addEventListener('click', () => {
+        row.remove();
+        if (!list.querySelector('[data-bank-account]')) {
+          const empty = document.createElement('div');
+          empty.className = 'empty-state';
+          empty.textContent = 'No bank accounts configured. Add one before saving if customers need bank transfer details.';
+          list.appendChild(empty);
+        }
+      });
+      row.appendChild(removeButton);
+      list.appendChild(row);
+      document.getElementById('bank-details-message').textContent = '';
+    }
+
+    async function loadBankDetails() {
+      const token = localStorage.getItem('admin_token');
+      const list = document.getElementById('bank-details-list');
+      const message = document.getElementById('bank-details-message');
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/bank-details', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not load bank details');
+        list.replaceChildren();
+        (data.accounts || []).forEach(account => addBankAccountRow(account));
+        if (!data.accounts?.length) {
+          const empty = document.createElement('div');
+          empty.className = 'empty-state';
+          empty.textContent = 'No bank accounts configured.';
+          list.appendChild(empty);
+        }
+      } catch (error) {
+        message.className = 'message error';
+        message.textContent = `✗ ${error.message}`;
+      }
+    }
+
+    async function saveBankDetails() {
+      const token = localStorage.getItem('admin_token');
+      const button = document.getElementById('save-bank-details-btn');
+      const message = document.getElementById('bank-details-message');
+      const accounts = [...document.querySelectorAll('[data-bank-account]')].map(row => {
+        const account = {};
+        row.querySelectorAll('[data-bank-field]').forEach(input => {
+          account[input.dataset.bankField] = input.value.trim();
+        });
+        return account;
+      });
+
+      button.disabled = true;
+      button.textContent = 'Saving...';
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/bank-details', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ accounts })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not save bank details');
+        message.className = 'message success';
+        message.textContent = `✓ Saved ${data.accounts.length} bank account${data.accounts.length === 1 ? '' : 's'} for future customer emails.`;
+      } catch (error) {
+        message.className = 'message error';
+        message.textContent = `✗ ${error.message}`;
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Save Bank Details';
+      }
     }
 
     async function loadSuggestions() {

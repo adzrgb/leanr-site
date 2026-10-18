@@ -5,6 +5,7 @@ let salePricing = { enabled: false, percent: 15 };
 document.addEventListener('DOMContentLoaded', () => {
   initBannerClose();
   initProductVisibility();
+  initMetalCatalog();
   initStockStatus();
   initDiscountPopup();
   initSalePricing();
@@ -59,6 +60,68 @@ function initProductVisibility() {
     .catch(() => {
       productGrid?.classList.add('visibility-ready');
     });
+}
+
+function initMetalCatalog() {
+  const productGrid = document.getElementById('product-grid');
+  if (!productGrid) return;
+
+  fetch(window.location.origin + '/api/public/metal-catalog')
+    .then(response => response.json())
+    .then(data => {
+      Object.entries(data.catalog || {}).forEach(([productId, product]) => {
+        const card = document.createElement('article');
+        card.className = 'product-card';
+        card.dataset.product = productId;
+        card.dataset.stockKey = productId;
+
+        const badge = document.createElement('span');
+        badge.className = 'product-badge';
+        badge.textContent = product.stock > 0 ? 'In stock' : 'Out of stock';
+        card.appendChild(badge);
+
+        const title = document.createElement('h3');
+        title.textContent = product.name;
+        card.appendChild(title);
+
+        const description = document.createElement('p');
+        description.textContent = product.description;
+        card.appendChild(description);
+
+        const productMeta = document.createElement('div');
+        productMeta.className = 'product-meta';
+        const price = document.createElement('span');
+        price.className = 'product-price';
+        price.dataset.price = product.price;
+        updateSalePriceDisplay(price, product.price);
+        const addButton = document.createElement('button');
+        addButton.className = 'add-btn';
+        addButton.textContent = product.stock > 0 ? 'Add to cart' : 'Out of stock';
+        addButton.disabled = product.stock <= 0;
+        addButton.addEventListener('click', () => {
+          if (addButton.disabled) return;
+          cart.push({
+            catalogId: productId,
+            name: product.name,
+            price: Number(product.price),
+            option: 'Decorative metal initial, 100mg',
+            quantity: 1
+          });
+          saveCart();
+          updateCartCount();
+          addButton.textContent = 'Added';
+          addButton.disabled = true;
+          setTimeout(() => {
+            addButton.textContent = 'Add to cart';
+            addButton.disabled = false;
+          }, 1500);
+        });
+        productMeta.append(price, addButton);
+        card.appendChild(productMeta);
+        productGrid.appendChild(card);
+      });
+    })
+    .catch(() => {});
 }
 
 // Handle cookie consent
@@ -192,7 +255,7 @@ function updateProductBadges(stockData) {
   });
   
   document.querySelectorAll('.product-card').forEach(card => {
-    const productName = card.querySelector('h3')?.textContent?.trim();
+    const productName = card.dataset.stockKey || card.querySelector('h3')?.textContent?.trim();
     const badge = card.querySelector('.product-badge');
     const addBtn = card.querySelector('.add-btn');
     

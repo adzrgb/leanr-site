@@ -176,6 +176,9 @@ EMAIL_QUEUE_FILE = os.path.join(DATA_DIR, "email_queue.json")
 DISCOUNT_SETTINGS_FILE = os.path.join(DATA_DIR, "discount_settings.json")
 PRODUCT_VISIBILITY_FILE = os.path.join(DATA_DIR, "product_visibility.json")
 PRODUCT_SUGGESTIONS_FILE = os.path.join(DATA_DIR, "product_suggestions.json")
+METAL_CATALOG_FILE = os.path.join(DATA_DIR, "metal_catalog.json")
+BANK_DETAILS_FILE = os.path.join(DATA_DIR, "bank_details.json")
+INVENTORY_ITEMS_FILE = os.path.join(DATA_DIR, "inventory_items.json")
 
 ORDERS_KEY = "orders"
 STOCK_KEY = "stock"
@@ -184,6 +187,27 @@ EMAIL_QUEUE_KEY = "email_queue"
 DISCOUNT_SETTINGS_KEY = "discount_settings"
 PRODUCT_VISIBILITY_KEY = "product_visibility"
 PRODUCT_SUGGESTIONS_KEY = "product_suggestions"
+METAL_CATALOG_KEY = "metal_catalog"
+BANK_DETAILS_KEY = "bank_details"
+INVENTORY_ITEMS_KEY = "inventory_items"
+
+DEFAULT_BANK_DETAILS = [
+    {'name': 'E Clegg', 'sort_code': '20-30-02', 'account_number': '90677582'},
+    {'name': 'MR A G WHALEN', 'sort_code': '51-70-43', 'account_number': '85451215'}
+]
+
+DEFAULT_METAL_CATALOG = {
+    "METAL_INITIAL_T": {
+        "name": "Metal Initial T (100mg)",
+        "description": "Decorative metal initial T, 100mg.",
+        "price": 165
+    },
+    "METAL_INITIAL_R": {
+        "name": "Metal Initial R (100mg)",
+        "description": "Decorative metal initial R, 100mg.",
+        "price": 170
+    }
+}
 
 DEFAULT_DISCOUNT_SETTINGS = {
     "enabled": True,
@@ -443,6 +467,58 @@ def set_product_visibility(visibility):
     save_product_visibility_data(current)
     return current
 
+def get_metal_catalog():
+    saved = load_state(METAL_CATALOG_KEY, METAL_CATALOG_FILE, {})
+    saved = saved if isinstance(saved, dict) else {}
+    catalog = {}
+    for product_id, defaults in DEFAULT_METAL_CATALOG.items():
+        entry = saved.get(product_id, {})
+        entry = entry if isinstance(entry, dict) else {}
+        catalog[product_id] = {
+            'name': str(entry.get('name') or defaults['name'])[:80],
+            'description': str(entry.get('description') or defaults['description'])[:500],
+            'price': defaults['price']
+        }
+    return catalog
+
+def save_metal_catalog(catalog):
+    save_state(METAL_CATALOG_KEY, METAL_CATALOG_FILE, catalog)
+
+def get_bank_details():
+    accounts = load_state(BANK_DETAILS_KEY, BANK_DETAILS_FILE, DEFAULT_BANK_DETAILS)
+    if not isinstance(accounts, list):
+        return DEFAULT_BANK_DETAILS.copy()
+    return [
+        {
+            'name': str(account.get('name', '')).strip()[:80],
+            'sort_code': str(account.get('sort_code', '')).strip()[:8],
+            'account_number': str(account.get('account_number', '')).strip()[:8]
+        }
+        for account in accounts if isinstance(account, dict)
+    ]
+
+def save_bank_details(accounts):
+    save_state(BANK_DETAILS_KEY, BANK_DETAILS_FILE, accounts)
+
+def bank_details_email_html():
+    accounts = get_bank_details()
+    if not accounts:
+        return '<p>Bank transfer details are currently unavailable. Please contact us for payment information.</p>'
+
+    return ''.join(
+        '<p><strong>Bank Transfer:</strong> '
+        f"{escape(account['name'])}<br>Sort code: {escape(account['sort_code'])}<br>"
+        f"Account number: {escape(account['account_number'])}</p>"
+        for account in accounts
+    )
+
+def get_inventory_items():
+    items = load_state(INVENTORY_ITEMS_KEY, INVENTORY_ITEMS_FILE, {})
+    return items if isinstance(items, dict) else {}
+
+def save_inventory_items(items):
+    save_state(INVENTORY_ITEMS_KEY, INVENTORY_ITEMS_FILE, items)
+
 # Initialize stock file if it doesn't exist
 default_stock = {
     "RETATRUTIDE": [
@@ -472,7 +548,9 @@ default_stock = {
     "SELANK": {"stock": 50},
     "SEMAX": {"stock": 50},
     "LEANr Hoodie - £100": {"stock": 50},
-    "LEANr Hoodie - £130": {"stock": 50}
+    "LEANr Hoodie - £130": {"stock": 50},
+    "METAL_INITIAL_T": {"stock": 50},
+    "METAL_INITIAL_R": {"stock": 50}
 }
 
 if not os.path.exists(STOCK_FILE):
@@ -583,6 +661,10 @@ def decrement_stock_for_order_items(items):
         if not product_name:
             return False, "Order item is missing product name"
 
+        catalog_id = item.get('catalogId')
+        if catalog_id in ('METAL_INITIAL_T', 'METAL_INITIAL_R'):
+            product_name = catalog_id
+
         try:
             quantity = int(item.get('quantity', 0))
         except (TypeError, ValueError):
@@ -598,7 +680,7 @@ def decrement_stock_for_order_items(items):
             continue
 
         option_value = item.get('option')
-        variant_name = _extract_variant_name(option_value)
+        variant_name = 'default' if catalog_id in ('METAL_INITIAL_T', 'METAL_INITIAL_R') else _extract_variant_name(option_value)
         effective_quantity = quantity
 
         # MT2 Nasal 20mg total uses two 10mg stock units.
@@ -718,6 +800,17 @@ def send_order():
         print(f"Order Number: {data.get('orderNumber')}")
         print(f"Customer: {data.get('customerName')}")
         print(f"Email: {data.get('customerEmail')}")
+
+        # Resolve editable metal-initial item details from the server-side catalog
+        # so client-side changes cannot alter their display names or prices.
+        metal_catalog = get_metal_catalog()
+        for item in data.get('items', []):
+            catalog_id = item.get('catalogId')
+            if catalog_id in metal_catalog:
+                item['name'] = metal_catalog[catalog_id]['name']
+                item['description'] = metal_catalog[catalog_id]['description']
+                item['price'] = metal_catalog[catalog_id]['price']
+                item['option'] = 'Decorative metal initial, 100mg'
         
         # Create order summary
         items_html = ""
@@ -909,8 +1002,7 @@ def send_order_emails(data, items_html, send_business_email=True):
                     </div>
                     <div class="payment-section">
                         <h3>Payment Information</h3>
-                        <p><strong>Bank Transfer:</strong> E Clegg<br>Sort code: 20-30-02<br>Account number: 90677582</p>
-                        <p><strong>Additional Bank Account:</strong> MR A G WHALEN<br>Sort code: 51-70-43<br>Account number: 85451215</p>
+                        {bank_details_email_html()}
                     </div>
                     {f'''<div class="order-details">
                         <h3>Royal Mail QR (Under £100 Orders)</h3>
@@ -2220,8 +2312,7 @@ def send_payment_reminder():
                     </div>
                     <div class="payment-section">
                         <h3>Payment Details</h3>
-                        <p><strong>PayPal:</strong> ellaclegg232@gmail.com</p>
-                        <p><strong>Bank Transfer:</strong> E Clegg<br>Sort code: 20-30-02<br>Account number: 90677582</p>
+                        {bank_details_email_html()}
                     </div>
                     <p>Please reply to this email if you have already paid or need any help.</p>
                     <p>Thank you,<br>The LEANr Team</p>
@@ -2441,6 +2532,14 @@ def get_stock():
                     'stock': product_data.get('stock', 0)
                 })
 
+        for item_id, item in get_inventory_items().items():
+            stock_list.append({
+                'name': item.get('name', 'Inventory item'),
+                'stock': int(item.get('stock', 0)),
+                'inventoryId': item_id,
+                'inventoryOnly': True
+            })
+
         # Virtual bundle stock is derived from component availability.
         stock_list.append({
             'name': BUNDLE_PRODUCT_NAME,
@@ -2473,6 +2572,7 @@ def update_stock():
         product_name = data.get('productName')
         variant = data.get('variant')
         new_stock = data.get('stock')
+        inventory_id = data.get('inventoryId')
 
         if not product_name or not variant:
             return jsonify({'error': 'Missing product or variant'}), 400
@@ -2484,6 +2584,14 @@ def update_stock():
 
         if new_stock < 0:
             return jsonify({'error': 'Stock cannot be negative'}), 400
+
+        if inventory_id:
+            inventory = get_inventory_items()
+            if inventory_id not in inventory:
+                return jsonify({'error': 'Inventory item not found'}), 404
+            inventory[inventory_id]['stock'] = new_stock
+            save_inventory_items(inventory)
+            return jsonify({'success': True, 'message': 'Inventory stock updated', 'stock': new_stock}), 200
 
         if product_name == BUNDLE_PRODUCT_NAME:
             return jsonify({'error': 'Bundle stock is calculated automatically'}), 400
@@ -2520,6 +2628,49 @@ def update_stock():
     except Exception as e:
         print(f"ERROR: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/inventory-items', methods=['POST', 'DELETE', 'OPTIONS'])
+def admin_inventory_items():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header.replace('Bearer ', '', 1) if auth_header.startswith('Bearer ') else ''
+    if not verify_token(token):
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    payload = request.get_json(silent=True) or {}
+    inventory = get_inventory_items()
+
+    if request.method == 'DELETE':
+        item_id = str(payload.get('inventoryId', ''))
+        if item_id not in inventory:
+            return jsonify({'success': False, 'error': 'Inventory item not found'}), 404
+        del inventory[item_id]
+        save_inventory_items(inventory)
+        return jsonify({'success': True}), 200
+
+    name = str(payload.get('name', '')).strip()
+    try:
+        initial_stock = int(payload.get('stock', 0))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Stock must be a whole number'}), 400
+
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 .()_+'-]{0,79}", name):
+        return jsonify({'success': False, 'error': 'Use a 1–80 character item name with letters, numbers, spaces, apostrophes, parentheses, periods, underscores, or hyphens'}), 400
+    if initial_stock < 0:
+        return jsonify({'success': False, 'error': 'Stock cannot be negative'}), 400
+    if len(inventory) >= 100:
+        return jsonify({'success': False, 'error': 'The inventory-only list is limited to 100 items'}), 400
+    existing_names = {str(item.get('name', '')).casefold() for item in inventory.values()}
+    existing_names.update(name.casefold() for name in load_stock_data())
+    if name.casefold() in existing_names:
+        return jsonify({'success': False, 'error': 'An item with that name already exists'}), 409
+
+    item_id = secrets.token_hex(8)
+    inventory[item_id] = {'name': name, 'stock': initial_stock}
+    save_inventory_items(inventory)
+    return jsonify({'success': True, 'item': {'inventoryId': item_id, 'name': name, 'stock': initial_stock}}), 201
 
 # Public endpoint for stock data (no auth required)
 @app.route('/api/public/stock', methods=['GET'])
@@ -2572,6 +2723,89 @@ def get_public_product_visibility():
     except Exception as e:
         print(f"ERROR fetching product visibility: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/public/metal-catalog', methods=['GET'])
+def get_public_metal_catalog():
+    catalog = get_metal_catalog()
+    stock = load_stock_data()
+    for product_id, item in catalog.items():
+        item['stock'] = int((stock.get(product_id) or {}).get('stock', 0))
+    return jsonify({'catalog': catalog}), 200
+
+@app.route('/api/admin/metal-catalog', methods=['GET', 'POST', 'OPTIONS'])
+def admin_metal_catalog():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header.replace('Bearer ', '', 1) if auth_header.startswith('Bearer ') else ''
+    if not verify_token(token):
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if request.method == 'GET':
+        return jsonify({'catalog': get_metal_catalog()}), 200
+
+    payload = request.get_json(silent=True) or {}
+    submitted = payload.get('catalog')
+    if not isinstance(submitted, dict):
+        return jsonify({'success': False, 'error': 'Catalog must be an object'}), 400
+
+    catalog = get_metal_catalog()
+    for product_id in DEFAULT_METAL_CATALOG:
+        values = submitted.get(product_id)
+        if not isinstance(values, dict):
+            return jsonify({'success': False, 'error': f'Missing catalog entry: {product_id}'}), 400
+        name = str(values.get('name', '')).strip()
+        description = str(values.get('description', '')).strip()
+        if not name or len(name) > 80:
+            return jsonify({'success': False, 'error': 'Names must be 1–80 characters'}), 400
+        if not description or len(description) > 500:
+            return jsonify({'success': False, 'error': 'Descriptions must be 1–500 characters'}), 400
+        catalog[product_id]['name'] = name
+        catalog[product_id]['description'] = description
+
+    save_metal_catalog(catalog)
+    return jsonify({'success': True, 'catalog': catalog}), 200
+
+@app.route('/api/admin/bank-details', methods=['GET', 'POST', 'OPTIONS'])
+def admin_bank_details():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header.replace('Bearer ', '', 1) if auth_header.startswith('Bearer ') else ''
+    if not verify_token(token):
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    if request.method == 'GET':
+        return jsonify({'accounts': get_bank_details()}), 200
+
+    payload = request.get_json(silent=True) or {}
+    accounts = payload.get('accounts')
+    if not isinstance(accounts, list) or len(accounts) > 10:
+        return jsonify({'success': False, 'error': 'Provide a list of up to 10 bank accounts'}), 400
+
+    cleaned_accounts = []
+    for account in accounts:
+        if not isinstance(account, dict):
+            return jsonify({'success': False, 'error': 'Each account must include a name, sort code, and account number'}), 400
+        name = str(account.get('name', '')).strip()
+        sort_code_digits = re.sub(r'\D', '', str(account.get('sort_code', '')))
+        account_number = re.sub(r'\D', '', str(account.get('account_number', '')))
+        if not name or len(name) > 80:
+            return jsonify({'success': False, 'error': 'Account holder names must be 1–80 characters'}), 400
+        if len(sort_code_digits) != 6:
+            return jsonify({'success': False, 'error': 'Sort codes must contain exactly 6 digits'}), 400
+        if len(account_number) != 8:
+            return jsonify({'success': False, 'error': 'UK account numbers must contain exactly 8 digits'}), 400
+        cleaned_accounts.append({
+            'name': name,
+            'sort_code': f'{sort_code_digits[:2]}-{sort_code_digits[2:4]}-{sort_code_digits[4:]}',
+            'account_number': account_number
+        })
+
+    save_bank_details(cleaned_accounts)
+    return jsonify({'success': True, 'accounts': cleaned_accounts}), 200
 
 @app.route('/api/admin/discount-settings', methods=['GET', 'POST', 'OPTIONS'])
 def admin_discount_settings():
