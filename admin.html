@@ -637,6 +637,7 @@
       <button class="tab-button" onclick="switchTab('visibility')">Products</button>
       <button class="tab-button" onclick="switchTab('catalog-text')">Catalogue Text</button>
       <button class="tab-button" onclick="switchTab('bank-details')">Email Bank Details</button>
+      <button class="tab-button" onclick="switchTab('clothing-manager')">Clothing Manager</button>
       <button class="tab-button" onclick="switchTab('suggestions')">Suggestions</button>
     </div>
     
@@ -759,6 +760,47 @@
       </div>
     </div>
 
+    <div id="clothing-manager" class="tab-content">
+      <h2>Clothing Storefront Manager</h2>
+      <div id="clothing-message" class="message" role="status" aria-live="polite"></div>
+      <p>Add or edit clothing listings, photos, prices, and stock. Only items in this clothing section can be published to the storefront.</p>
+      <div class="stock-card" style="margin-bottom: 1.25rem;">
+        <h3 id="clothing-form-title">Add Clothing Item</h3>
+        <input id="clothing-id" type="hidden">
+        <div class="stock-form-group">
+          <label for="clothing-name">Product name</label>
+          <input id="clothing-name" type="text" maxlength="80" placeholder="e.g. LEANr Zip Hoodie">
+        </div>
+        <div class="stock-form-group">
+          <label for="clothing-description">Description</label>
+          <textarea id="clothing-description" rows="4" maxlength="500" style="width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 6px;" placeholder="Describe the clothing item"></textarea>
+        </div>
+        <div class="stock-form-group">
+          <label for="clothing-price">Price (£)</label>
+          <input id="clothing-price" type="number" min="0.01" max="100000" step="0.01" placeholder="0.00">
+        </div>
+        <div class="stock-form-group">
+          <label for="clothing-stock">Stock quantity</label>
+          <input id="clothing-stock" type="number" min="0" step="1" placeholder="0">
+        </div>
+        <div class="stock-form-group">
+          <label for="clothing-image">Product photo (JPG, PNG, or WebP; up to 5 MB)</label>
+          <input id="clothing-image" type="file" accept="image/jpeg,image/png,image/webp" onchange="previewClothingPhoto(this)">
+          <img id="clothing-image-preview" alt="Clothing photo preview" hidden style="display: block; max-width: 220px; max-height: 220px; object-fit: cover; margin-top: 0.75rem; border-radius: 8px;">
+        </div>
+        <label style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; font-weight: 600;">
+          <input id="clothing-published" type="checkbox" checked style="width: 20px; height: 20px;">
+          Publish to storefront
+        </label>
+        <button class="discount-save-btn" id="save-clothing-btn" onclick="saveClothingItem()">Save Clothing Item</button>
+        <button class="reset-stock-btn" id="cancel-clothing-edit-btn" onclick="resetClothingForm()" hidden>Cancel Edit</button>
+      </div>
+      <h3>Current Clothing Listings</h3>
+      <div id="clothing-list" class="stock-grid">
+        <div class="empty-state">Loading clothing listings...</div>
+      </div>
+    </div>
+
     <div id="suggestions" class="tab-content">
       <h2>Product Suggestions</h2>
       <div id="suggestions-admin-message" class="message"></div>
@@ -784,6 +826,7 @@
       loadProductVisibility();
       loadMetalCatalog();
       loadBankDetails();
+      loadClothingCatalog();
       loadSuggestions();
 
       // Keep orders list fresh so new checkouts appear automatically.
@@ -952,6 +995,10 @@
     // Track stock changes
     let stockChanges = {};
     let loadedStockValues = {};
+
+    function escapeAdminHtml(value) {
+      return String(value ?? '').replace(/[&<>\"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+    }
     
     async function loadStockLevels() {
       try {
@@ -970,8 +1017,9 @@
         
         grid.innerHTML = data.stock.map(product => `
           <div class="stock-card">
-            <h3>${product.name}</h3>
+            <h3>${escapeAdminHtml(product.name)}</h3>
             ${product.inventoryOnly ? '<p style="color: #64748b;">Back-office inventory only — not listed for sale.</p>' : ''}
+            ${product.isClothing ? '<p style="color: #64748b;">Managed in Clothing Manager; storefront listing stock.</p>' : ''}
             ${product.isVirtual ? `
               <div class="stock-form-group">
                 <label>Calculated Bundle Stock</label>
@@ -979,20 +1027,20 @@
                   type="number" 
                   min="0" 
                   value="${product.stock}"
-                  data-product="${product.name}"
+                  data-product="${escapeAdminHtml(product.name)}"
                   data-variant="default"
                   disabled>
                 <small style="color: #64748b;">Auto-calculated from GHK-CU Pen, MT2 Nasal, and MT2 Pen stock.</small>
               </div>
             ` : product.variants ? product.variants.map(variant => `
               <div class="stock-form-group">
-                <label>${variant.name}</label>
+                <label>${escapeAdminHtml(variant.name)}</label>
                 <input 
                   type="number" 
                   min="0" 
                   value="${variant.stock}" 
-                  data-product="${product.name}"
-                  data-variant="${variant.name}"
+                  data-product="${escapeAdminHtml(product.name)}"
+                  data-variant="${escapeAdminHtml(variant.name)}"
                   oninput="trackStockChange(this)"
                   onchange="trackStockChange(this)">
               </div>
@@ -1003,9 +1051,10 @@
                   type="number" 
                   min="0" 
                   value="${product.stock}"
-                  data-product="${product.name}"
+                  data-product="${escapeAdminHtml(product.name)}"
                   data-variant="default"
                   ${product.inventoryOnly ? `data-inventory-id="${product.inventoryId}"` : ''}
+                  ${product.isClothing ? `data-clothing-id="${product.clothingId}"` : ''}
                   oninput="trackStockChange(this)"
                   onchange="trackStockChange(this)">
               </div>
@@ -1039,6 +1088,7 @@
         productName: product,
         variant: variant,
         inventoryId: input.dataset.inventoryId || null,
+        clothingId: input.dataset.clothingId || null,
         stock: parsed
       };
     }
@@ -1065,6 +1115,7 @@
             productName: product,
             variant,
             inventoryId: input.dataset.inventoryId || null,
+            clothingId: input.dataset.clothingId || null,
             stock: parsed
           });
         }
@@ -1571,6 +1622,198 @@
       } finally {
         button.disabled = false;
         button.textContent = 'Save Bank Details';
+      }
+    }
+
+    function resetClothingForm() {
+      document.getElementById('clothing-id').value = '';
+      document.getElementById('clothing-name').value = '';
+      document.getElementById('clothing-description').value = '';
+      document.getElementById('clothing-price').value = '';
+      document.getElementById('clothing-stock').value = '';
+      document.getElementById('clothing-image').value = '';
+      document.getElementById('clothing-published').checked = true;
+      const preview = document.getElementById('clothing-image-preview');
+      preview.src = '';
+      preview.hidden = true;
+      document.getElementById('clothing-form-title').textContent = 'Add Clothing Item';
+      document.getElementById('save-clothing-btn').textContent = 'Save Clothing Item';
+      document.getElementById('cancel-clothing-edit-btn').hidden = true;
+    }
+
+    function previewClothingPhoto(input) {
+      const file = input.files[0];
+      const preview = document.getElementById('clothing-image-preview');
+      if (!file) return;
+      preview.src = URL.createObjectURL(file);
+      preview.hidden = false;
+    }
+
+    function editClothingItem(clothingId) {
+      const item = clothingItemsCache[clothingId];
+      if (!item) return;
+      document.getElementById('clothing-id').value = clothingId;
+      document.getElementById('clothing-name').value = item.name;
+      document.getElementById('clothing-description').value = item.description;
+      document.getElementById('clothing-price').value = item.price;
+      document.getElementById('clothing-stock').value = item.stock;
+      document.getElementById('clothing-published').checked = item.published;
+      document.getElementById('clothing-image').value = '';
+      const preview = document.getElementById('clothing-image-preview');
+      preview.src = item.imageUrl;
+      preview.hidden = !item.imageUrl;
+      document.getElementById('clothing-form-title').textContent = 'Edit Clothing Item';
+      document.getElementById('save-clothing-btn').textContent = 'Save Changes';
+      document.getElementById('cancel-clothing-edit-btn').hidden = false;
+      document.getElementById('clothing-manager').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    let clothingItemsCache = {};
+
+    async function loadClothingCatalog() {
+      const list = document.getElementById('clothing-list');
+      const message = document.getElementById('clothing-message');
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/clothing-catalog', {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token')}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not load clothing listings');
+        clothingItemsCache = data.items || {};
+        list.replaceChildren();
+
+        const entries = Object.entries(clothingItemsCache);
+        if (!entries.length) {
+          const empty = document.createElement('div');
+          empty.className = 'empty-state';
+          empty.textContent = 'No clothing listings yet. Use the form above to add one.';
+          list.appendChild(empty);
+          return;
+        }
+
+        entries.forEach(([clothingId, item]) => {
+          const card = document.createElement('div');
+          card.className = 'stock-card';
+          const image = document.createElement('img');
+          image.src = item.imageUrl;
+          image.alt = item.name;
+          image.loading = 'lazy';
+          image.style.cssText = 'width: 100%; max-height: 220px; object-fit: cover; border-radius: 8px;';
+          const heading = document.createElement('h3');
+          heading.textContent = item.name;
+          const description = document.createElement('p');
+          description.textContent = item.description;
+          const details = document.createElement('p');
+          details.textContent = `£${Number(item.price).toFixed(2)} · Stock: ${item.stock} · ${item.published ? 'Published' : 'Hidden'}`;
+          const editButton = document.createElement('button');
+          editButton.className = 'discount-save-btn';
+          editButton.textContent = 'Edit';
+          editButton.addEventListener('click', () => editClothingItem(clothingId));
+          const removeButton = document.createElement('button');
+          removeButton.className = 'hide-products-btn';
+          removeButton.textContent = 'Remove';
+          removeButton.addEventListener('click', () => deleteClothingItem(clothingId, removeButton));
+          card.append(image, heading, description, details, editButton, removeButton);
+          list.appendChild(card);
+        });
+        message.textContent = '';
+      } catch (error) {
+        message.className = 'message error';
+        message.textContent = `✗ ${error.message}`;
+      }
+    }
+
+    async function saveClothingItem() {
+      const message = document.getElementById('clothing-message');
+      const button = document.getElementById('save-clothing-btn');
+      const name = document.getElementById('clothing-name').value.trim();
+      const description = document.getElementById('clothing-description').value.trim();
+      const price = Number(document.getElementById('clothing-price').value);
+      const stock = Number(document.getElementById('clothing-stock').value);
+      const imageFile = document.getElementById('clothing-image').files[0];
+      const clothingId = document.getElementById('clothing-id').value;
+
+      if (!name || !description || !Number.isFinite(price) || price <= 0 || !Number.isInteger(stock) || stock < 0) {
+        message.className = 'message error';
+        message.textContent = 'Enter a name, description, positive price, and non-negative whole-number stock.';
+        return;
+      }
+      if (!clothingId && !imageFile) {
+        message.className = 'message error';
+        message.textContent = 'Choose a clothing photo before adding the listing.';
+        return;
+      }
+      if (imageFile && (!['image/jpeg', 'image/png', 'image/webp'].includes(imageFile.type) || imageFile.size > 5 * 1024 * 1024)) {
+        message.className = 'message error';
+        message.textContent = 'Choose a JPG, PNG, or WebP photo smaller than 5 MB.';
+        return;
+      }
+
+      button.disabled = true;
+      button.textContent = 'Saving...';
+      try {
+        let imageData = '';
+        if (imageFile) {
+          imageData = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error('Could not read the selected photo'));
+            reader.readAsDataURL(imageFile);
+          });
+        }
+        const response = await fetch(window.location.origin + '/api/admin/clothing-catalog', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+          },
+          body: JSON.stringify({
+            clothingId,
+            name,
+            description,
+            price,
+            stock,
+            published: document.getElementById('clothing-published').checked,
+            imageData
+          })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not save clothing listing');
+        message.className = 'message success';
+        message.textContent = `✓ ${name} saved. ${data.item.published ? 'It is published to the storefront.' : 'It is hidden from the storefront.'}`;
+        resetClothingForm();
+        await Promise.all([loadClothingCatalog(), loadStockLevels()]);
+      } catch (error) {
+        message.className = 'message error';
+        message.textContent = `✗ ${error.message}`;
+      } finally {
+        button.disabled = false;
+        button.textContent = document.getElementById('clothing-id').value ? 'Save Changes' : 'Save Clothing Item';
+      }
+    }
+
+    async function deleteClothingItem(clothingId, button) {
+      const item = clothingItemsCache[clothingId];
+      if (!confirm(`Remove ${item?.name || 'this clothing listing'} from the storefront and stock list?`)) return;
+      button.disabled = true;
+      try {
+        const response = await fetch(window.location.origin + '/api/admin/clothing-catalog', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`
+          },
+          body: JSON.stringify({ clothingId })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not remove clothing listing');
+        document.getElementById('clothing-message').className = 'message success';
+        document.getElementById('clothing-message').textContent = '✓ Clothing listing removed.';
+        await Promise.all([loadClothingCatalog(), loadStockLevels()]);
+      } catch (error) {
+        document.getElementById('clothing-message').className = 'message error';
+        document.getElementById('clothing-message').textContent = `✗ ${error.message}`;
+        button.disabled = false;
       }
     }
 

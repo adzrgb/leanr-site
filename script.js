@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initBannerClose();
   initProductVisibility();
   initMetalCatalog();
+  initClothingCatalog();
   initStockStatus();
   initDiscountPopup();
   initSalePricing();
@@ -122,6 +123,79 @@ function initMetalCatalog() {
       });
     })
     .catch(() => {});
+}
+
+function initClothingCatalog() {
+  const productGrid = document.getElementById('product-grid');
+  if (!productGrid) return;
+
+  fetch(window.location.origin + '/api/public/clothing-catalog')
+    .then(response => {
+      if (!response.ok) throw new Error('Could not load clothing listings');
+      return response.json();
+    })
+    .then(data => {
+      (data.items || []).forEach(item => {
+        const card = document.createElement('article');
+        card.className = 'product-card';
+        card.dataset.product = item.clothingId;
+        card.dataset.stockKey = item.clothingId;
+
+        const badge = document.createElement('span');
+        badge.className = 'product-badge';
+        badge.textContent = Number(item.stock) > 0 ? 'In stock' : 'Out of stock';
+        card.appendChild(badge);
+
+        const image = document.createElement('img');
+        image.className = 'product-image';
+        image.src = item.imageUrl;
+        image.alt = item.name;
+        image.loading = 'lazy';
+        card.appendChild(image);
+
+        const heading = document.createElement('h3');
+        heading.textContent = item.name;
+        card.appendChild(heading);
+        const description = document.createElement('p');
+        description.textContent = item.description;
+        card.appendChild(description);
+
+        const meta = document.createElement('div');
+        meta.className = 'product-meta';
+        const price = document.createElement('span');
+        price.className = 'product-price';
+        price.dataset.price = item.price;
+        updateSalePriceDisplay(price, item.price);
+        const button = document.createElement('button');
+        button.className = 'add-btn';
+        button.textContent = Number(item.stock) > 0 ? 'Add to cart' : 'Out of stock';
+        button.disabled = Number(item.stock) <= 0;
+        button.addEventListener('click', () => {
+          if (button.disabled) return;
+          const existing = cart.find(cartItem => cartItem.clothingId === item.clothingId);
+          if (existing) existing.quantity += 1;
+          else cart.push({
+            clothingId: item.clothingId,
+            name: item.name,
+            price: Number(item.price),
+            option: '',
+            quantity: 1
+          });
+          saveCart();
+          updateCartCount();
+          button.textContent = 'Added';
+          button.disabled = true;
+          setTimeout(() => {
+            button.textContent = 'Add to cart';
+            button.disabled = false;
+          }, 1200);
+        });
+        meta.append(price, button);
+        card.appendChild(meta);
+        productGrid.appendChild(card);
+      });
+    })
+    .catch(error => console.warn(error.message));
 }
 
 // Handle cookie consent

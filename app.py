@@ -25,6 +25,7 @@ from email.mime.base import MIMEBase
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", secrets.token_urlsafe(32))
+app.config['MAX_CONTENT_LENGTH'] = 8 * 1024 * 1024
 
 SITE_PASSWORD = os.getenv("SITE_PASSWORD", "")
 
@@ -179,6 +180,9 @@ PRODUCT_SUGGESTIONS_FILE = os.path.join(DATA_DIR, "product_suggestions.json")
 METAL_CATALOG_FILE = os.path.join(DATA_DIR, "metal_catalog.json")
 BANK_DETAILS_FILE = os.path.join(DATA_DIR, "bank_details.json")
 INVENTORY_ITEMS_FILE = os.path.join(DATA_DIR, "inventory_items.json")
+CLOTHING_CATALOG_FILE = os.path.join(DATA_DIR, "clothing_catalog.json")
+CLOTHING_UPLOAD_DIR = os.path.join(DATA_DIR, "clothing_uploads")
+os.makedirs(CLOTHING_UPLOAD_DIR, exist_ok=True)
 
 ORDERS_KEY = "orders"
 STOCK_KEY = "stock"
@@ -190,6 +194,7 @@ PRODUCT_SUGGESTIONS_KEY = "product_suggestions"
 METAL_CATALOG_KEY = "metal_catalog"
 BANK_DETAILS_KEY = "bank_details"
 INVENTORY_ITEMS_KEY = "inventory_items"
+CLOTHING_CATALOG_KEY = "clothing_catalog"
 
 DEFAULT_BANK_DETAILS = [
     {'name': 'E Clegg', 'sort_code': '20-30-02', 'account_number': '90677582'},
@@ -519,6 +524,35 @@ def get_inventory_items():
 def save_inventory_items(items):
     save_state(INVENTORY_ITEMS_KEY, INVENTORY_ITEMS_FILE, items)
 
+def get_clothing_catalog():
+    catalog = load_state(CLOTHING_CATALOG_KEY, CLOTHING_CATALOG_FILE, {})
+    return catalog if isinstance(catalog, dict) else {}
+
+def save_clothing_catalog(catalog):
+    save_state(CLOTHING_CATALOG_KEY, CLOTHING_CATALOG_FILE, catalog)
+
+def decode_clothing_image(data_url):
+    """Validate and decode a small raster image uploaded for a clothing listing."""
+    if not isinstance(data_url, str) or ',' not in data_url or not data_url.startswith('data:image/'):
+        raise ValueError('Choose a JPG, PNG, or WebP image')
+    header, encoded = data_url.split(',', 1)
+    try:
+        image_bytes = base64.b64decode(encoded, validate=True)
+    except (ValueError, base64.binascii.Error):
+        raise ValueError('The selected image could not be decoded')
+    if not image_bytes or len(image_bytes) > 5 * 1024 * 1024:
+        raise ValueError('Images must be smaller than 5 MB')
+
+    if image_bytes.startswith(b'\xff\xd8\xff'):
+        extension = 'jpg'
+    elif image_bytes.startswith(b'\x89PNG\r\n\x1a\n'):
+        extension = 'png'
+    elif len(image_bytes) >= 12 and image_bytes[:4] == b'RIFF' and image_bytes[8:12] == b'WEBP':
+        extension = 'webp'
+    else:
+        raise ValueError('Only valid JPG, PNG, or WebP images are supported')
+    return image_bytes, extension
+
 # Initialize stock file if it doesn't exist
 default_stock = {
     "RETATRUTIDE": [
@@ -655,6 +689,7 @@ def decrement_stock_for_order_items(items):
     """Reduce stock for each ordered item. Returns (ok, error_message)."""
     stock_data = load_stock_data()
     decrements = {}
+    clothing_decrements = {}
 
     for item in items or []:
         product_name = str(item.get('name', '')).strip()
@@ -664,6 +699,17 @@ def decrement_stock_for_order_items(items):
         catalog_id = item.get('catalogId')
         if catalog_id in ('METAL_INITIAL_T', 'METAL_INITIAL_R'):
             product_name = catalog_id
+
+        clothing_id = item.get('clothingId')
+        if clothing_id:
+            try:
+                quantity = int(item.get('quantity', 0))
+            except (TypeError, ValueError):
+                return False, f"Invalid quantity for {product_name}"
+            if quantity <= 0:
+                return False, f"Quantity must be greater than 0 for {product_name}"
+            clothing_decrements[clothing_id] = clothing_decrements.get(clothing_id, 0) + quantity
+            continue
 
         try:
             quantity = int(item.get('quantity', 0))
@@ -714,6 +760,14 @@ def decrement_stock_for_order_items(items):
             if current_stock < quantity:
                 return False, f"Not enough stock for {product_name} {variant_name}"
 
+    clothing_catalog = get_clothing_catalog()
+    for clothing_id, quantity in clothing_decrements.items():
+        clothing_item = clothing_catalog.get(clothing_id)
+        if not clothing_item or not clothing_item.get('published', True):
+            return False, "Clothing item is no longer available"
+        if int(clothing_item.get('stock', 0)) < quantity:
+            return False, f"Not enough stock for {clothing_item.get('name', 'clothing item')}"
+
     # Apply decrements after all validations pass.
     for key, quantity in decrements.items():
         product_name, variant_name = key.split('|', 1)
@@ -725,7 +779,13 @@ def decrement_stock_for_order_items(items):
             variant_obj = next((v for v in product_stock if v.get('name') == variant_name), None)
             variant_obj['stock'] = int(variant_obj.get('stock', 0)) - quantity
 
-    save_stock_data(stock_data)
+    if clothing_decrements:
+        for clothing_id, quantity in clothing_decrements.items():
+            clothing_catalog[clothing_id]['stock'] = int(clothing_catalog[clothing_id].get('stock', 0)) - quantity
+        save_clothing_catalog(clothing_catalog)
+
+    if decrements:
+        save_stock_data(stock_data)
     return True, ""
 
 @app.route('/api/send-order', methods=['POST', 'OPTIONS'])
@@ -770,6 +830,29 @@ def send_order():
         allowed_percent = SECRET_DISCOUNT_PERCENT if is_secret_discount else discount_settings['percent']
 
         subtotal_value = float(data.get('subtotal', 0) or 0)
+        clothing_catalog = get_clothing_catalog()
+        for item in data.get('items', []):
+            clothing_id = item.get('clothingId')
+            if not clothing_id:
+                continue
+            clothing_item = clothing_catalog.get(clothing_id)
+            if not clothing_item or not clothing_item.get('published', True):
+                return jsonify({'success': False, 'error': 'A clothing item in your cart is no longer available'}), 400
+            try:
+                quantity = int(item.get('quantity', 0))
+                submitted_price = float(item.get('price', 0) or 0)
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'error': 'Invalid clothing item in cart'}), 400
+            if quantity <= 0:
+                return jsonify({'success': False, 'error': 'Invalid clothing quantity'}), 400
+            subtotal_value += (float(clothing_item['price']) - submitted_price) * quantity
+            item['name'] = clothing_item['name']
+            item['description'] = clothing_item['description']
+            item['price'] = float(clothing_item['price'])
+            item['option'] = ''
+
+        data['subtotal'] = round(subtotal_value, 2)
+
         postage_value = float(data.get('postage', 0) or 0)
 
         gift_items = [item for item in data.get('items', []) if item.get('option', '').endswith('Free bank holiday gift')]
@@ -2540,6 +2623,14 @@ def get_stock():
                 'inventoryOnly': True
             })
 
+        for clothing_id, item in get_clothing_catalog().items():
+            stock_list.append({
+                'name': item.get('name', 'Clothing item'),
+                'stock': int(item.get('stock', 0)),
+                'clothingId': clothing_id,
+                'isClothing': True
+            })
+
         # Virtual bundle stock is derived from component availability.
         stock_list.append({
             'name': BUNDLE_PRODUCT_NAME,
@@ -2573,6 +2664,7 @@ def update_stock():
         variant = data.get('variant')
         new_stock = data.get('stock')
         inventory_id = data.get('inventoryId')
+        clothing_id = data.get('clothingId')
 
         if not product_name or not variant:
             return jsonify({'error': 'Missing product or variant'}), 400
@@ -2584,6 +2676,14 @@ def update_stock():
 
         if new_stock < 0:
             return jsonify({'error': 'Stock cannot be negative'}), 400
+
+        if clothing_id:
+            catalog = get_clothing_catalog()
+            if clothing_id not in catalog:
+                return jsonify({'error': 'Clothing item not found'}), 404
+            catalog[clothing_id]['stock'] = new_stock
+            save_clothing_catalog(catalog)
+            return jsonify({'success': True, 'message': 'Clothing stock updated', 'stock': new_stock}), 200
 
         if inventory_id:
             inventory = get_inventory_items()
@@ -2694,6 +2794,13 @@ def get_public_stock():
                     'stock': product_info.get('stock', 0)
                 })
 
+        for clothing_id, item in get_clothing_catalog().items():
+            if item.get('published', True):
+                stock_list.append({
+                    'name': clothing_id,
+                    'stock': int(item.get('stock', 0))
+                })
+
         # Virtual bundle stock is derived from component availability.
         stock_list.append({
             'name': BUNDLE_PRODUCT_NAME,
@@ -2731,6 +2838,119 @@ def get_public_metal_catalog():
     for product_id, item in catalog.items():
         item['stock'] = int((stock.get(product_id) or {}).get('stock', 0))
     return jsonify({'catalog': catalog}), 200
+
+@app.route('/api/public/clothing-catalog', methods=['GET'])
+def get_public_clothing_catalog():
+    catalog = get_clothing_catalog()
+    return jsonify({
+        'items': [
+            {
+                'clothingId': clothing_id,
+                'name': item.get('name', ''),
+                'description': item.get('description', ''),
+                'price': item.get('price', 0),
+                'stock': item.get('stock', 0),
+                'imageUrl': item.get('imageUrl', '')
+            }
+            for clothing_id, item in catalog.items()
+            if item.get('published', True)
+        ]
+    }), 200
+
+@app.route('/api/public/clothing-image/<filename>')
+def get_clothing_image(filename):
+    if not re.fullmatch(r'[a-f0-9]{32}(?:_[a-f0-9]{8})?\.(?:jpg|png|webp)', filename):
+        return jsonify({'error': 'Image not found'}), 404
+    return send_from_directory(CLOTHING_UPLOAD_DIR, filename, max_age=3600)
+
+@app.route('/api/admin/clothing-catalog', methods=['GET', 'POST', 'DELETE', 'OPTIONS'])
+def admin_clothing_catalog():
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header.replace('Bearer ', '', 1) if auth_header.startswith('Bearer ') else ''
+    if not verify_token(token):
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+
+    catalog = get_clothing_catalog()
+    if request.method == 'GET':
+        return jsonify({'items': catalog}), 200
+
+    payload = request.get_json(silent=True) or {}
+    if request.method == 'DELETE':
+        clothing_id = str(payload.get('clothingId', ''))
+        item = catalog.pop(clothing_id, None)
+        if not item:
+            return jsonify({'success': False, 'error': 'Clothing item not found'}), 404
+        save_clothing_catalog(catalog)
+        image_name = os.path.basename(item.get('imageUrl', ''))
+        if re.fullmatch(r'[a-f0-9]{32}(?:_[a-f0-9]{8})?\.(?:jpg|png|webp)', image_name):
+            try:
+                os.remove(os.path.join(CLOTHING_UPLOAD_DIR, image_name))
+            except OSError as error:
+                print(f"WARN: Could not remove clothing image {image_name}: {error}", flush=True)
+                pass
+        return jsonify({'success': True}), 200
+
+    clothing_id = str(payload.get('clothingId', '')).strip()
+    if clothing_id and clothing_id not in catalog:
+        return jsonify({'success': False, 'error': 'Clothing item not found'}), 404
+    if not clothing_id and len(catalog) >= 100:
+        return jsonify({'success': False, 'error': 'The clothing catalog is limited to 100 items'}), 400
+
+    name = str(payload.get('name', '')).strip()
+    description = str(payload.get('description', '')).strip()
+    if not name or len(name) > 80:
+        return jsonify({'success': False, 'error': 'Name must be 1–80 characters'}), 400
+    if not description or len(description) > 500:
+        return jsonify({'success': False, 'error': 'Description must be 1–500 characters'}), 400
+    try:
+        price = float(payload.get('price'))
+        stock = int(payload.get('stock'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Enter a valid price and whole-number stock'}), 400
+    if not (0 < price <= 100000) or not price == price:
+        return jsonify({'success': False, 'error': 'Price must be greater than £0 and no more than £100,000'}), 400
+    if stock < 0:
+        return jsonify({'success': False, 'error': 'Stock cannot be negative'}), 400
+
+    clothing_id = clothing_id or secrets.token_hex(16)
+    old_item = catalog.get(clothing_id, {})
+    image_url = old_item.get('imageUrl', '')
+    image_data = payload.get('imageData')
+    if image_data:
+        if not isinstance(image_data, str) or len(image_data) > 7 * 1024 * 1024:
+            return jsonify({'success': False, 'error': 'Images must be smaller than 5 MB'}), 400
+        try:
+            image_bytes, extension = decode_clothing_image(image_data)
+        except ValueError as error:
+            return jsonify({'success': False, 'error': str(error)}), 400
+        filename = f'{clothing_id}_{secrets.token_hex(4)}.{extension}'
+        with open(os.path.join(CLOTHING_UPLOAD_DIR, filename), 'wb') as image_file:
+            image_file.write(image_bytes)
+        image_url = f'/api/public/clothing-image/{filename}'
+    elif not image_url:
+        return jsonify({'success': False, 'error': 'Choose a clothing photo before saving'}), 400
+
+    catalog[clothing_id] = {
+        'name': name,
+        'description': description,
+        'price': round(price, 2),
+        'stock': stock,
+        'published': bool(payload.get('published', True)),
+        'imageUrl': image_url
+    }
+    save_clothing_catalog(catalog)
+    if old_item.get('imageUrl') and image_url != old_item.get('imageUrl'):
+        previous_image = os.path.basename(old_item['imageUrl'])
+        if re.fullmatch(r'[a-f0-9]{32}(?:_[a-f0-9]{8})?\.(?:jpg|png|webp)', previous_image):
+            try:
+                os.remove(os.path.join(CLOTHING_UPLOAD_DIR, previous_image))
+            except OSError as error:
+                print(f"WARN: Could not remove replaced clothing image {previous_image}: {error}", flush=True)
+                pass
+    return jsonify({'success': True, 'clothingId': clothing_id, 'item': catalog[clothing_id]}), 200
 
 @app.route('/api/admin/metal-catalog', methods=['GET', 'POST', 'OPTIONS'])
 def admin_metal_catalog():
